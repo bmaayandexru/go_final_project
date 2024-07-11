@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/bmaayandexru/go_final_project/db"
 	"github.com/bmaayandexru/go_final_project/tests"
 )
 
 var mux *http.ServeMux
 
 func main() {
+	db.InitDBase()
 	// лог-контроль
 	fmt.Println("Запускаем сервер")
 	mux = http.NewServeMux()
@@ -30,6 +32,7 @@ func main() {
 	fmt.Printf("envPort *%s* settingdStrPort *%s* \n", envStrPort, settingsStrPort)
 	fmt.Println("Set port from enviroment...")
 	err := http.ListenAndServe(envStrPort, mux)
+
 	if err != nil {
 		panic(err)
 	}
