@@ -3,9 +3,38 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/bmaayandexru/go_final_project/tests"
 )
+
+var mux *http.ServeMux
+
+func main() {
+	// лог-контроль
+	fmt.Println("Запускаем сервер")
+	mux = http.NewServeMux()
+	// вешаем обработчик
+	mux.HandleFunc("/m", mainHandle)
+	//	webDir := "web/"
+	//	mux.Handle("/", http.FileServer(http.Dir(webDir)))
+	// запуск файлового сервера в подкаталоге web
+	mux.Handle("/", http.FileServer(http.Dir("web/")))
+	// переменая tests.Port из settings.go
+	// !!! заменить на переменную окружения TODO_PORT с помощью os.Getenv(key string) string
+	// порт из settings.go
+	settingsStrPort := fmt.Sprintf(":%d", tests.Port)
+	// порт из переменной окружения. задание со *
+	envStrPort := os.Getenv("TODO_PORT")
+	// лог-контроль
+	fmt.Printf("envPort *%s* settingdStrPort *%s* \n", envStrPort, settingsStrPort)
+	fmt.Println("Set port from enviroment...")
+	err := http.ListenAndServe(envStrPort, mux)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Завершаем работу")
+}
 
 func mainHandle(res http.ResponseWriter, req *http.Request) {
 	// лог-контроль
@@ -16,27 +45,6 @@ func mainHandle(res http.ResponseWriter, req *http.Request) {
 	fmt.Println(s)
 	// отправка клиенту
 	res.Write([]byte(s))
-}
-
-func main() {
-	// лог-контроль
-	fmt.Println("Запускаем сервер")
-	mux := http.NewServeMux()
-	// вешаем обработчик
-	mux.HandleFunc("/main", mainHandle)
-	// webDir := "static"
-	webDir := ""
-	mux.Handle("/", http.FileServer(http.Dir(webDir)))
-	// переменая tests.Port из settings.go
-	// !!! заменить на переменную окружения TODO_PORT с помощью os.Getenv(key string) string
-	portStr := fmt.Sprintf(":%d", tests.Port)
-	// лог-контроль
-	fmt.Println(portStr)
-	err := http.ListenAndServe(portStr, mux)
-	// err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Завершаем работу")
+	// webDir := "web/" + req.URL.Path
+	// mux.Handle("/", http.FileServer(http.Dir(webDir)))
 }
