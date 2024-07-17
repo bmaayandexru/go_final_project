@@ -40,6 +40,7 @@ func main() {
 	// вешаем отладочный обработчик
 	mux.HandleFunc("/d", handlers.DbgHandle)
 	mux.HandleFunc("/api/nextdate", handlers.NextDateHandle)
+	mux.HandleFunc("/api/task", handlers.TaskHandle)
 	// запуск файлового сервера в подкаталоге web
 	mux.Handle("/", http.FileServer(http.Dir("web/")))
 	// определение порта прослушки

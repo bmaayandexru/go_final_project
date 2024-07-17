@@ -47,6 +47,26 @@ func NextDateHandle(res http.ResponseWriter, req *http.Request) {
 	res.Write([]byte(retStr))
 }
 
+func TaskHandle(res http.ResponseWriter, req *http.Request) {
+	// лог-контроль
+	fmt.Println("Получен запрос api/task ")
+	// запрос в строку
+	s := fmt.Sprintf("Host: %s\nPath: %s\nMethod: %s", req.Host, req.URL.Path, req.Method)
+	// лог-контроль
+	fmt.Println(s)
+	switch req.Method {
+	case "POST":
+		strDate := req.FormValue("date")
+		strTitle := req.FormValue("title")
+		strComment := req.FormValue("comment")
+		strRepeat := req.FormValue("repeat")
+		s, _ := fmt.Printf("date *%s* title *%s* comment *%s* repeat *%s*\n", strDate, strTitle, strComment, strRepeat)
+		fmt.Println(s) // лог контроль
+	case "GET":
+	case "DELETE":
+	}
+}
+
 // фнкция пересчета следующей даты
 // now — время от которого ищется ближайшая дата;
 // date — строка времени в формате 20060102, от которого начинается отсчёт повторений;
@@ -288,6 +308,8 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			nowDate := now
 			nextDate := now.AddDate(1, 0, 0)
 			// проверяем числа меяцев в каждом году
+			// !!! отдельно проверить m 30,31 2
+			// !!! этих чисел нет ни в одном году
 			for _, month := range slMonth {
 				if err := checkDaysMonth(slDays, time.Date(nowDate.Year(), time.Month(month), 1, 0, 0, 0, 0, time.Local)); err != nil {
 					return "", err
