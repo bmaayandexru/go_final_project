@@ -32,7 +32,7 @@ func main() {
 		fmt.Printf("retstr *%s* err *%v*\n", s, e)
 		return
 	*/
-
+	//***
 	dbt.InitDBase()
 	// лог-контроль
 	fmt.Println("Запускаем сервер")
