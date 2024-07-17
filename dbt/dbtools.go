@@ -22,7 +22,7 @@ import (
 	"github.com/bmaayandexru/go_final_project/tests"
 )
 
-// см bmadraft.md
+// см bmanote.md
 var schemaSQL string = `
 CREATE TABLE scheduler (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

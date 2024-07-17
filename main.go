@@ -6,18 +6,32 @@ import (
 	"os"
 
 	"github.com/bmaayandexru/go_final_project/dbt"
+	"github.com/bmaayandexru/go_final_project/handlers"
 	"github.com/bmaayandexru/go_final_project/tests"
 )
 
 var mux *http.ServeMux
 
 func main() {
+	/*
+		now, _ := time.Parse("20060102", "20240126")
+		s, e := h.NextDate(now, "20240229", "y") //возвращает 20250301;
+		fmt.Printf("retstr *%s* err *%v*\n", s, e)
+		s, e = h.NextDate(now, "20240113", "d 7") //возвращает 20240127;
+		fmt.Printf("retstr *%s* err *%v*\n", s, e)
+		s, e = h.NextDate(now, "20240116", "m 16,5") //возвращает 20240205;
+		fmt.Printf("retstr *%s* err *%v*\n", s, e)
+		s, e = h.NextDate(now, "20240201", "m -1,18") // возвращает 20240218;
+		fmt.Printf("retstr *%s* err *%v*\n", s, e)
+		return
+	*/
 	dbt.InitDBase()
 	// лог-контроль
 	fmt.Println("Запускаем сервер")
 	mux = http.NewServeMux()
 	// вешаем отладочный обработчик
-	mux.HandleFunc("/m", mainHandle)
+	mux.HandleFunc("/d", handlers.DbgHandle)
+	mux.HandleFunc("/api/nextdate", handlers.NextDateHandle)
 	// запуск файлового сервера в подкаталоге web
 	mux.Handle("/", http.FileServer(http.Dir("web/")))
 	// определение порта прослушки
@@ -50,16 +64,4 @@ func defStrPort() string {
 	// итоговое значение
 	fmt.Printf("Set port %s \n", defPort)
 	return ":" + defPort
-}
-
-// отладочный обработчик. убрать
-func mainHandle(res http.ResponseWriter, req *http.Request) {
-	// лог-контроль
-	fmt.Println("Получен запрос")
-	// запрос в строку
-	s := fmt.Sprintf("Host: %s\nPath: %s\nMethod: %s", req.Host, req.URL.Path, req.Method)
-	// лог-контроль
-	fmt.Println(s)
-	// отправка клиенту
-	res.Write([]byte(s))
 }
