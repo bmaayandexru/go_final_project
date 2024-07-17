@@ -31,10 +31,20 @@ func NextDateHandle(res http.ResponseWriter, req *http.Request) {
 	s := fmt.Sprintf("Host: %s\nPath: %s\nMethod: %s", req.Host, req.URL.Path, req.Method)
 	// лог-контроль
 	fmt.Println(s)
-	//rs := req.FormValue()
-	//fmt.Println(rs)
+	strNow := req.FormValue("now")
+	strDate := req.FormValue("date")
+	strRepeat := req.FormValue("repeat")
+	fmt.Printf("now *%s* date *%s* repeat *%s*\n", strNow, strDate, strRepeat)
+	now, err := time.Parse("20060102", strNow)
+	if err != nil {
+		return
+	}
+	retStr, err := NextDate(now, strDate, strRepeat)
+	if err != nil {
+		return
+	}
 	// отправка клиенту
-	res.Write([]byte(s))
+	res.Write([]byte(retStr))
 }
 
 // фнкция пересчета следующей даты
@@ -95,13 +105,20 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		// fmt.Printf("кол-во дней %d \n", dcount)                     // *** лог контроль
 		// fmt.Printf("Дата старта %s \n", startDate.Format(template)) // *** лог контроль
 		// расчет полных периодов до нужной даты
-		itc := int(now.Sub(startDate).Hours()/24)/dcount + 1
+		itc := 1
+		if startDate.Before(now) {
+			itc = int(now.Sub(startDate).Hours()/24)/dcount + 1
+		}
 		// fmt.Printf("Полных периодов +1 %v \n", itc)
 		startDate = startDate.AddDate(0, 0, dcount*itc)
 		// fmt.Printf("Дата на выдачу %s\n", startDate.Format(template)) // *** лог контроль
 		return startDate.Format(template), nil
 
 	case "y": // y год
+		// !!! в любом случае идет перенос даты на год хотя бы однократно.
+		// дальше сравниваем получившуюся даты с текущей
+		// и если получившаяся меньше добавляем еще год
+		// до тех пор пока получишаяся не будет больше текущей
 		// fmt.Println("год")
 		// у Y не может быть 2го слайса/числа
 		// разложить rs[1] на слайс
@@ -109,6 +126,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			return "", errors.New("y: param count error (!= 0)") // ошибка количества параметров
 		}
 		// fmt.Printf("Дата старта %s\n", startDate.Format(template))
+		startDate = startDate.AddDate(1, 0, 0)
 		for startDate.Before(now) {
 			startDate = startDate.AddDate(1, 0, 0)
 			fmt.Printf("Итерация %v\n ", startDate)
@@ -151,7 +169,9 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		return curDay.Format(template), nil
 	case "m":
 		// m дни месяца
+		// если в месяце нет дня (29, 30, 31) значит ищем следующий месяц с таким днем
 		// у m может быть слайс из чисел 1..31,-1,-2
+		// если date > now то делается хотя бы один шаг
 		// fmt.Println("месяц")
 		if len(repSlice) < 2 {
 			return "", errors.New("m: There is no number of days")
@@ -172,35 +192,57 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		}
 		sort.Ints(slDays) // в slDays отсортированные дни
 		// fmt.Println("Дни ", slDays) // *** лог контроль
+		var nowDate, nextDate, next2Date time.Time
 		if len(repSlice) == 2 {
 			// тут только один список
-			// формируем даты на текущий и следующий месяц
-			nowDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local) // 1е число текущего месяца
-			nextDate := nowDate.AddDate(0, 1, 0)                                     // 1e число следующего месяца
-			// проверяем значения слайса дней на присутствие в каждом меняце nowDate и nextDate
-			// от now и next Берутся только год и месяц
-			if err := checkDaysMonth(slDays, nowDate); err != nil {
-				return "", err
-			}
-			if err := checkDaysMonth(slDays, nextDate); err != nil {
-				return "", err
+			// формируем даты на текущий и следующий  месяц
+			if startDate.Before(now) {
+				nowDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local) // 1е число текущего месяца
+				nextDate = nowDate.AddDate(0, 1, 0)                                     // 1e число следующего месяца
+				next2Date = nextDate.AddDate(0, 1, 0)                                   // 1e число месяца через один от текущего
+			} else {
+				nowDate = time.Date(startDate.Year(), startDate.Month(), 1, 0, 0, 0, 0, time.Local) // 1е число текущего месяца
+				nextDate = nowDate.AddDate(0, 1, 0)                                                 // 1e число следующего месяца
+				next2Date = nextDate.AddDate(0, 1, 0)                                               // 1e число месяца через один от текущего
 			}
 			// строки дат в формате "20060102"
 			slDates := make([]string, 0, len(slDays)*2)
 			for _, day := range slDays {
 				if day > 0 {
 					// добавляем с слайс даты для каждого месяца
-					slDates = append(slDates, time.Date(nowDate.Year(), nowDate.Month(), day, 0, 0, 0, 0, time.Local).Format(template))
-					slDates = append(slDates, time.Date(nextDate.Year(), nextDate.Month(), day, 0, 0, 0, 0, time.Local).Format(template))
+					// если стартовая дата меньше получившейся
+					// если день есть в текущем месяце
+					if checkDayMonth(day, nowDate) == nil {
+						tt := time.Date(nowDate.Year(), nowDate.Month(), day, 0, 0, 0, 0, time.Local)
+						if startDate.Before(tt) {
+							slDates = append(slDates, tt.Format(template))
+						}
+					}
+					if checkDayMonth(day, nextDate) == nil {
+						tt := time.Date(nextDate.Year(), nextDate.Month(), day, 0, 0, 0, 0, time.Local)
+						if startDate.Before(tt) {
+							slDates = append(slDates, tt.Format(template))
+						}
+					}
+					if checkDayMonth(day, next2Date) == nil {
+						tt := time.Date(next2Date.Year(), next2Date.Month(), day, 0, 0, 0, 0, time.Local)
+						if startDate.Before(tt) {
+							slDates = append(slDates, tt.Format(template))
+						}
+					}
 				} else {
 					// day < 0
 					// взять 1е число следующего месяца и сложить с day с помощья AddDate(0,0,day)
 					nowD := time.Date(nowDate.Year(), nowDate.Month(), 1, 0, 0, 0, 0, time.Local)
 					nowD = nowD.AddDate(0, 1, day)
-					slDates = append(slDates, nowD.Format(template))
+					if startDate.Before(nowD) {
+						slDates = append(slDates, nowD.Format(template))
+					}
 					nextD := time.Date(nextDate.Year(), nextDate.Month(), 1, 0, 0, 0, 0, time.Local)
 					nextD = nextD.AddDate(0, 1, day)
-					slDates = append(slDates, nextD.Format(template))
+					if startDate.Before(nextD) {
+						slDates = append(slDates, nextD.Format(template))
+					}
 				}
 			}
 			sort.Strings(slDates)
@@ -212,12 +254,12 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			for _, date := range slDates {
 				t, e := time.Parse(template, date)
 				if e == nil {
-					fmt.Println("Сравнение ", date, now.Format(template))
+					//fmt.Println("Сравнение ", date, now.Format(template))
 					if now.Before(t) {
 						return date, nil
-					} else {
+					} /* else {
 						fmt.Printf("Drop date %s\n", date)
-					}
+					}*/
 				}
 			}
 		} else {
@@ -259,16 +301,26 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			for _, month := range slMonth {
 				for _, day := range slDays {
 					if day > 0 {
-						slDates = append(slDates, time.Date(nowDate.Year(), time.Month(month), day, 0, 0, 0, 0, time.Local).Format(template))
-						slDates = append(slDates, time.Date(nextDate.Year(), time.Month(month), day, 0, 0, 0, 0, time.Local).Format(template))
+						tt := time.Date(nowDate.Year(), time.Month(month), day, 0, 0, 0, 0, time.Local)
+						if startDate.Before(tt) {
+							slDates = append(slDates, tt.Format(template))
+						}
+						tt = time.Date(nextDate.Year(), time.Month(month), day, 0, 0, 0, 0, time.Local)
+						if startDate.Before(tt) {
+							slDates = append(slDates, tt.Format(template))
+						}
 					} else {
 						// day < 0
 						nowD := time.Date(nowDate.Year(), time.Month(month), 1, 0, 0, 0, 0, time.Local)
 						nowD = nowD.AddDate(0, 1, day)
-						slDates = append(slDates, nowD.Format(template))
+						if startDate.Before(nowD) {
+							slDates = append(slDates, nowD.Format(template))
+						}
 						nextD := time.Date(nextDate.Year(), time.Month(month), 1, 0, 0, 0, 0, time.Local)
 						nextD = nextD.AddDate(0, 1, day)
-						slDates = append(slDates, nextD.Format(template))
+						if startDate.Before(nextD) {
+							slDates = append(slDates, nextD.Format(template))
+						}
 					}
 				}
 			}
@@ -284,9 +336,9 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 					//	fmt.Println("Сравнение ", date, now.Format(template))
 					if now.Before(t) {
 						return date, nil
-					} else {
+					} /* else {
 						fmt.Printf("Drop date %s\n", date)
-					}
+					}*/
 				}
 			}
 		}
@@ -322,6 +374,36 @@ func checkDaysMonth(slDays []int, date time.Time) error {
 				if day == 30 || day == 29 {
 					return errors.New(fmt.Sprintf("cDM error: There is no %dth in the %d month of %d", day, date.Month(), date.Year()))
 				}
+			}
+		}
+	}
+	return nil
+}
+
+func checkDayMonth(day int, date time.Time) error {
+	// месяцы в которых нет 31го числа
+	msless31 := map[int]bool{2: true, 4: true, 6: true, 9: true, 11: true}
+	if day <= 28 {
+		// все дни до 28 числа включительно проходят проверку
+		return nil
+	}
+	// не все 31е числа есть в месяцах
+	if day == 31 && msless31[int(date.Month())] {
+		return errors.New(fmt.Sprintf("cDM error: There is no %dth in the %d month of %d", day, date.Month(), date.Year()))
+	}
+	// февраль проверяем отдельно
+	// если високосный проверяем 30
+	// если не високосный проверяем 29 30
+	if date.Month() == 2 {
+		if date.Year()%4 == 0 {
+			// високосный год
+			if day == 30 {
+				return errors.New(fmt.Sprintf("cDM error: There is no %dth in the %d month of %d", day, date.Month(), date.Year()))
+			}
+		} else {
+			// не високосный год
+			if day == 30 || day == 29 {
+				return errors.New(fmt.Sprintf("cDM error: There is no %dth in the %d month of %d", day, date.Month(), date.Year()))
 			}
 		}
 	}
