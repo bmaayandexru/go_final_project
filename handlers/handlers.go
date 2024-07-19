@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,9 +10,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	dbt "github.com/bmaayandexru/go_final_project/dbt"
 )
 
 const operationTypes string = "dywm"
+
+type Task struct {
+	// ID      int    `json:"id"`
+	Date    string `json:"date"` // omitempty
+	Title   string `json:"title"`
+	Comment string `json:"comment"` // omitempty
+	Repeat  string `json:"repeat"`  // omitempty
+}
 
 // отладочный обработчик. убрать
 func DbgHandle(res http.ResponseWriter, req *http.Request) {
@@ -51,17 +63,51 @@ func TaskHandle(res http.ResponseWriter, req *http.Request) {
 	// лог-контроль
 	fmt.Println("Получен запрос api/task ")
 	// запрос в строку
-	s := fmt.Sprintf("Host: %s\nPath: %s\nMethod: %s", req.Host, req.URL.Path, req.Method)
-	// лог-контроль
-	fmt.Println(s)
+	// s := fmt.Sprintf("Host: %s\nPath: %s\nMethod: %s", req.Host, req.URL.Path, req.Method)
+	// fmt.Println(s)
+
 	switch req.Method {
 	case "POST":
-		strDate := req.FormValue("date")
-		strTitle := req.FormValue("title")
-		strComment := req.FormValue("comment")
-		strRepeat := req.FormValue("repeat")
-		s, _ := fmt.Printf("date *%s* title *%s* comment *%s* repeat *%s*\n", strDate, strTitle, strComment, strRepeat)
-		fmt.Println(s) // лог контроль
+		fmt.Println("POST")
+		var task Task
+		var buf bytes.Buffer
+		// читаем тело запроса
+		_, err := buf.ReadFrom(req.Body)
+		if err != nil {
+			fmt.Println("ошибка чтения тела запроса")
+			http.Error(res, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// десериализуем JSON в Artist
+		fmt.Println("buf.Bytes():", string(buf.Bytes()))
+		if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
+			fmt.Println("ошибка десериализации")
+			http.Error(res, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fmt.Printf("Task Date *%s* Title *%s* Comment *%s* Repeat *%s*\n", task.Date, task.Title, task.Comment, task.Repeat)
+		// Task положить в базу и определить id
+		// добавить данные в базу
+		resDBEx, err := dbt.SqlDB.Exec("INSERT INTO scheduler(date, title, comment, repeat) VALUES (?, ?, ?, ?) ", task.Date, task.Title, task.Comment, task.Repeat)
+		if err != nil {
+			fmt.Printf("Ошибка при добавлении в БД: %v\n", err)
+			return
+		}
+		// определить id
+		id, err := resDBEx.LastInsertId()
+		// вернуть id из базы в json
+		// кодируем id для отправки ответа
+		arrBytes, err := json.Marshal(id)
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Printf("arrBytes *%s*\n", string(arrBytes))
+
+		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusOK)
+		res.Write(arrBytes)
+
 	case "GET":
 	case "DELETE":
 	}

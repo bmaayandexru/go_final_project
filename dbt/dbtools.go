@@ -35,45 +35,31 @@ CREATE INDEX idx_date ON scheduler (date);
 CREATE UNIQUE INDEX idx_title ON scheduler (title); 
 `
 
-var sqlDB *sql.DB
+var SqlDB *sql.DB
 
 func InitDBase() {
 	fmt.Println("Init Data Base...")
-	fmt.Println("settings DBFile", tests.DBFile)
+	//fmt.Println("settings DBFile", tests.DBFile)
 	envDBFile := os.Getenv("TODO_DBFILE")
-	fmt.Println("enviroment DBFile ", envDBFile)
+	//fmt.Println("enviroment DBFile ", envDBFile)
 	if envDBFile == "" {
 		envDBFile = tests.DBFile
 	}
 	fmt.Println("Result DBFile ", envDBFile)
-	// лог схемы
-	// fmt.Println(schemaSQL)
-	/*
-		appPath, err := os.Executable()
-		if err != nil {
-			log.Fatal(err)
-		}
-		dbFile := filepath.Join(filepath.Dir(appPath), "scheduler.db")
-	*/
 	_, err := os.Stat(envDBFile)
-	var install bool
-	/*
-		if err != nil {
-			install = true
-		}
-	*/
-	install = (err != nil)
+	//	var install bool
+	install := (err != nil)
 	fmt.Println("Need install ", install)
 	// если install равен true, после открытия БД требуется выполнить
 	// sql-запрос с CREATE TABLE и CREATE INDEX
-	sqlDB, err = sql.Open("sqlite", envDBFile)
+	SqlDB, err = sql.Open("sqlite", envDBFile)
 	if err != nil {
 		fmt.Println("bma err:", err)
 		return
 	}
 	if install {
 		// нужно создать таблицу, т к файла не было
-		if _, err = sqlDB.Exec(schemaSQL); err != nil {
+		if _, err = SqlDB.Exec(schemaSQL); err != nil {
 			fmt.Println(err)
 		}
 	}
