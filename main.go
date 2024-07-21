@@ -14,21 +14,9 @@ var mux *http.ServeMux
 
 func main() {
 	/*
-			now, _ := time.Parse("20060102", "20240126")
-			s, e := h.NextDate(now, "20240229", "y") //возвращает 20250301;
-			fmt.Printf("retstr *%s* err *%v*\n", s, e)
-			//s, e = h.NextDate(now, "20240113", "d 7") //возвращает 20240127;
-			//fmt.Printf("retstr *%s* err *%v*\n", s, e)
-			s, e = h.NextDate(now, "20240116", "m 16,5") //возвращает 20240205;
-			fmt.Printf("retstr *%s* err *%v*\n", s, e)
-			s, e = h.NextDate(now, "20240201", "m -1,18") // возвращает 20240218;
-			fmt.Printf("retstr *%s* err *%v*\n", s, e)
-			s, e = h.NextDate(now, "20240228", "d 1") // возвращает 20240218;
-			fmt.Printf("retstr *%s* err *%v*\n", s, e)
-			return
-
-		d, e := time.Parse("20060102", "20240126")
-		s, e := handlers.NextDate(d, "20240409", "m 31") // возвращает 20240218;
+		//d, e := time.Parse("20060102", "20240126")
+		d := time.Now()
+		s, e := handlers.NextDate(d, "20240409", "m 1,7 2,12")
 		fmt.Printf("retstr *%s* err *%v*\n", s, e)
 		return
 	*/
@@ -38,7 +26,6 @@ func main() {
 	fmt.Println("Запускаем сервер")
 	mux = http.NewServeMux()
 	// вешаем отладочный обработчик
-	mux.HandleFunc("/d", handlers.DbgHandle)
 	mux.HandleFunc("/api/nextdate", handlers.NextDateHandle)
 	mux.HandleFunc("/api/task", handlers.TaskHandle)
 	// запуск файлового сервера в подкаталоге web

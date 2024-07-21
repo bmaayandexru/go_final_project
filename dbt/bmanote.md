@@ -11,4 +11,4 @@ CREATE TABLE scheduler (
 // индекс создавать не нужно он создаётся автоматически
 // CREATE INDEX idx_id ON id; 
 CREATE INDEX idx_date ON scheduler (date); // нужен индекс по date
-CREATE UNIQUE INDEX idx_title ON scheduler (title); // (bma) будет полезным и явно не лишим
+CREATE INDEX idx_title ON scheduler (title); // (bma) будет полезным и явно не лишим
