@@ -221,26 +221,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 			return "", errors.New("d: число вне диапазона (<1 >400)") // число вне диапазона
 		}
 		// тут всё корректно. можно возвращать значение
-		/*
-			if dcount == 1 && startDate.Before(now) {
-				// не проходит тест поэтому так
-				return now.Format(template), nil
-				// тест прошел. очень странно
-			}
-		*/
-		/*
-			itc := 1
-			if startDate.Before(now) {
-				// расчет полных периодов до нужной даты
-				itc = int(now.Sub(startDate).Hours()/24)/dcount + 1
-			}
-			startDate = startDate.AddDate(0, 0, dcount*itc)
-		*/
-		/*
-			for startDate.Before(now) {
-				startDate = startDate.AddDate(0, 0, dcount)
-			}
-		*/
+		// делаем сранение дат через строки, чтобы не учитывать часы минуты и секунды
 		for startDate.Format(template) < now.Format(template) {
 			startDate = startDate.AddDate(0, 0, dcount)
 		}
