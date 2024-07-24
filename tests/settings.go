@@ -14,5 +14,8 @@ var DBFileRun = "scheduler.db"
 
 // var FullNextDate = false
 var FullNextDate = true
-var Search = false
+
+// var Search = false
+var Search = true
+
 var Token = ``

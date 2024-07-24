@@ -67,30 +67,24 @@ func bmaError(res http.ResponseWriter, sErr string, statuCode int) {
 
 func TasksGETSearchString(res http.ResponseWriter, req *http.Request) {
 	search := req.URL.Query().Get("search")
-	fmt.Printf("Строка *%s*", search)
+	fmt.Printf("Строка *%s*\n", search)
+	search = "%" + search + "%"
+	// search = strings.ToUpper(search)
+	fmt.Println(search)
+	// работает. тоже требовательно к регистру
+	rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler WHERE UPPER(title) LIKE UPPER(:search) OR UPPER(comment) LIKE UPPER(:search) ORDER BY date LIMIT :limit",
+		sql.Named("search", search),
+		sql.Named("limit", 50))
+
 	/*
-	   -- вариант с именованными параметрами sql.Named()
-	   SELECT * FROM scheduler WHERE title LIKE :search OR comment LIKE :search ORDER BY date LIMIT :limit
+		//	РАБОТАЕТ!!! требовательно к регистру
+		rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler WHERE title LIKE :search OR comment LIKE :search ORDER BY date LIMIT :limit",
+			sql.Named("search", search),
+			sql.Named("limit", 50))
 	*/
-}
-
-func TasksGETSearchDate(res http.ResponseWriter, req *http.Request) {
-	search := req.URL.Query().Get("search")
-	date, _ := time.Parse("02.01.2006", search)
-	fmt.Printf("Дата %v\n", date)
-	/*
-	   -- вариант с именованными параметрами sql.Named()
-	   SELECT * FROM scheduler WHERE date = :date LIMIT :limit
-	*/
-}
-
-func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
-
-	fmt.Println("Вывести все задачи")
-	rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler ORDER BY date LIMIT :limit", sql.Named("limit", 50))
 	if err != nil {
 		fmt.Println(err)
-		bmaError(res, fmt.Sprintf("Ts GET: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
+		bmaError(res, fmt.Sprintf("Ts GET SS: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
 		return
 	}
 	defer rows.Close()
@@ -101,27 +95,113 @@ func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
 		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 		if err != nil {
 			fmt.Println(err)
-			bmaError(res, fmt.Sprintf("Ts GET: Ошибка сканирования ответа: %s\n", err.Error()), http.StatusOK)
+			bmaError(res, fmt.Sprintf("Ts GET SS: Ошибка rows.Scan(): %s\n", err.Error()), http.StatusOK)
+			return
+		}
+		sTsks.Tasks = append(sTsks.Tasks, task)
+	}
+	fmt.Println(sTsks.Tasks)
+	if err := rows.Err(); err != nil {
+		fmt.Println(err)
+		bmaError(res, fmt.Sprintf("Ts GET SS: Ошибка rows.Next(): %s\n", err.Error()), http.StatusOK)
+		return
+	}
+
+	// здесь сформирован слайс задач
+	// преборазовать в json и вернуть
+	arrBytes, err := json.Marshal(sTsks)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("TH GET SS: Ошибка json.Marshal(sTsks): %v\n", err), http.StatusOK)
+		return
+	}
+
+	// запись результата в JSON
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(arrBytes)
+}
+
+func TasksGETSearchDate(res http.ResponseWriter, req *http.Request) {
+	search := req.URL.Query().Get("search")
+	date, _ := time.Parse("02.01.2006", search)
+	fmt.Printf("Дата %v\n", date)
+	rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler WHERE date = :date LIMIT :limit",
+		sql.Named("date", date.Format("20060102")),
+		sql.Named("limit", 50))
+
+	if err != nil {
+		fmt.Println(err)
+		bmaError(res, fmt.Sprintf("Ts GET SD: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	defer rows.Close()
+	sTsks.Tasks = make([]dbt.Task, 0)
+
+	for rows.Next() {
+		task := dbt.Task{}
+		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			fmt.Println(err)
+			bmaError(res, fmt.Sprintf("Ts GET SD: Ошибка rows.Scan(): %s\n", err.Error()), http.StatusOK)
 			return
 		}
 		sTsks.Tasks = append(sTsks.Tasks, task)
 	}
 	if err := rows.Err(); err != nil {
 		fmt.Println(err)
-		bmaError(res, fmt.Sprintf("Ts GET: Ошибка rows.Next(): %s\n", err.Error()), http.StatusOK)
+		bmaError(res, fmt.Sprintf("Ts GET SD: Ошибка rows.Next(): %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	// fmt.Println("Задачи", sTsks.Tasks)
 
 	// здесь сформирован слайс задач
 	// преборазовать в json и вернуть
 	arrBytes, err := json.Marshal(sTsks)
 	if err != nil {
-		bmaError(res, fmt.Sprintf("TH POST: Ошибка json.Marshal(id): %v\n", err), http.StatusOK)
+		bmaError(res, fmt.Sprintf("TH GET SD: Ошибка json.Marshal(sTsks): %v\n", err), http.StatusOK)
 		return
 	}
-	// *** лог контроль
-	// fmt.Printf("ret json *%s*\n", string(arrBytes))
+
+	// запись результата в JSON
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(arrBytes)
+}
+
+func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
+
+	fmt.Println("Вывести все задачи")
+	rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler ORDER BY date LIMIT :limit", sql.Named("limit", 50))
+	if err != nil {
+		fmt.Println(err)
+		bmaError(res, fmt.Sprintf("Ts GET AT: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	defer rows.Close()
+	sTsks.Tasks = make([]dbt.Task, 0)
+
+	for rows.Next() {
+		task := dbt.Task{}
+		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			fmt.Println(err)
+			bmaError(res, fmt.Sprintf("Ts GET AT: Ошибка rows.Scan(): %s\n", err.Error()), http.StatusOK)
+			return
+		}
+		sTsks.Tasks = append(sTsks.Tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		fmt.Println(err)
+		bmaError(res, fmt.Sprintf("Ts GET AT: Ошибка rows.Next(): %s\n", err.Error()), http.StatusOK)
+		return
+	}
+
+	// здесь сформирован слайс задач
+	// преборазовать в json и вернуть
+	arrBytes, err := json.Marshal(sTsks)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("TH GET AT: Ошибка json.Marshal(id): %v\n", err), http.StatusOK)
+		return
+	}
 
 	// запись результата в JSON
 	res.Header().Set("Content-Type", "application/json")

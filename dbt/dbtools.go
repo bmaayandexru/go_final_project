@@ -38,7 +38,8 @@ CREATE INDEX idx_title ON scheduler (title);
 // CREATE UNIQUE INDEX idx_title ON scheduler (title);
 
 type Task struct {
-	ID      int    `json:"id"`
+	//	ID      int    `json:"id"`
+	ID      string `json:"id"`
 	Date    string `json:"date"` // omitempty
 	Title   string `json:"title"`
 	Comment string `json:"comment"` // omitempty
