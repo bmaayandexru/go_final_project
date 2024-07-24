@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,11 +25,17 @@ type bmaId struct {
 	Id string `json:"id"`
 }
 
+type bmaTask struct {
+	Tasks []dbt.Task `json:"tasks"`
+}
+
+var sTsks bmaTask
+
 func NextDateHandle(res http.ResponseWriter, req *http.Request) {
 	// лог-контроль
 	fmt.Println("Получен запрос api/nextdate ")
 	// запрос в строку
-	s := fmt.Sprintf("Host: %s\nPath: %s\nMethod: %s", req.Host, req.URL.Path, req.Method)
+	s := fmt.Sprintf("Host: %s Path: %s Method: %s", req.Host, req.URL.Path, req.Method)
 	// лог-контроль
 	fmt.Println(s)
 	strNow := req.FormValue("now")
@@ -58,109 +65,225 @@ func bmaError(res http.ResponseWriter, sErr string, statuCode int) {
 	res.Write(aBytes)
 }
 
-func TaskHandle(res http.ResponseWriter, req *http.Request) {
+func TasksGETSearchString(res http.ResponseWriter, req *http.Request) {
+	search := req.URL.Query().Get("search")
+	fmt.Printf("Строка *%s*", search)
+	/*
+	   -- вариант с именованными параметрами sql.Named()
+	   SELECT * FROM scheduler WHERE title LIKE :search OR comment LIKE :search ORDER BY date LIMIT :limit
+	*/
+}
+
+func TasksGETSearchDate(res http.ResponseWriter, req *http.Request) {
+	search := req.URL.Query().Get("search")
+	date, _ := time.Parse("02.01.2006", search)
+	fmt.Printf("Дата %v\n", date)
+	/*
+	   -- вариант с именованными параметрами sql.Named()
+	   SELECT * FROM scheduler WHERE date = :date LIMIT :limit
+	*/
+}
+
+func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
+
+	fmt.Println("Вывести все задачи")
+	rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler ORDER BY date LIMIT :limit", sql.Named("limit", 50))
+	if err != nil {
+		fmt.Println(err)
+		bmaError(res, fmt.Sprintf("Ts GET: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	defer rows.Close()
+	sTsks.Tasks = make([]dbt.Task, 0)
+
+	for rows.Next() {
+		task := dbt.Task{}
+		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			fmt.Println(err)
+			bmaError(res, fmt.Sprintf("Ts GET: Ошибка сканирования ответа: %s\n", err.Error()), http.StatusOK)
+			return
+		}
+		sTsks.Tasks = append(sTsks.Tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		fmt.Println(err)
+		bmaError(res, fmt.Sprintf("Ts GET: Ошибка rows.Next(): %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	// fmt.Println("Задачи", sTsks.Tasks)
+
+	// здесь сформирован слайс задач
+	// преборазовать в json и вернуть
+	arrBytes, err := json.Marshal(sTsks)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("TH POST: Ошибка json.Marshal(id): %v\n", err), http.StatusOK)
+		return
+	}
+	// *** лог контроль
+	// fmt.Printf("ret json *%s*\n", string(arrBytes))
+
+	// запись результата в JSON
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(arrBytes)
+}
+
+func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
+	// var task dbt.Task
+	// var buf bytes.Buffer
+	// получаем значение GET-параметра с именем name
+	fmt.Println("GET запрос task. Не реализован")
+	bmaError(res, "Return Error", http.StatusOK)
+}
+
+func TasksGETHandle(res http.ResponseWriter, req *http.Request) {
+	// получаем значение GET-параметра с именем search
+	search := req.URL.Query().Get("search")
+	if len(search) == 0 {
+		// вывести все задачи
+		TasksGETAllTasks(res, req)
+		return
+	} else {
+		fmt.Printf("Search *%s*\n", search)
+		// пробуем парсить в дату
+		_, e := time.Parse("02.01.2006", search)
+		if e == nil {
+			// это дата
+			TasksGETSearchDate(res, req)
+			return
+		} else {
+			// не получилось - ищем строку в title лил comment
+			TasksGETSearchString(res, req)
+			return
+		}
+	}
+	bmaError(res, "Return Error", http.StatusOK)
+}
+
+func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
 	var task dbt.Task
 	var buf bytes.Buffer
-	// запрос в строку
-	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
-	fmt.Println(s)
-
-	switch req.Method {
-	case "POST":
-		// читаем тело запроса
-		_, err := buf.ReadFrom(req.Body)
+	// читаем тело запроса
+	_, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		// http.Error(res, err.Error(), http.StatusBadRequest)
+		bmaError(res, fmt.Sprintf("TH POST: Ошибка чтения тела запроса: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	// *** лог контроль
+	fmt.Println("Post buf.Bytes():", buf.String())
+	// десериализуем JSON в task
+	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
+		//http.Error(res, err.Error(), http.StatusBadRequest)
+		bmaError(res, fmt.Sprintf("TH POST: Ошибка десериализации: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	// лог контроль
+	fmt.Printf("Unmarshal Task Date *%s* Title *%s* Comment *%s* Repeat *%s*\n", task.Date, task.Title, task.Comment, task.Repeat)
+	// анализ входных данных
+	// Поле Title обязательное
+	if len(task.Title) == 0 {
+		bmaError(res, "TH POST: Поле `Задача*` пустое", http.StatusOK)
+		return
+	}
+	// Если поле date не указано или содержит пустую строку,
+	if len(task.Date) == 0 {
+		// берётся сегодняшнее число.
+		task.Date = time.Now().Format("20060102")
+	} else {
+		//  task.Date не пустое. пробуем распарсить
+		_, err = time.Parse("20060102", task.Date)
 		if err != nil {
-			// http.Error(res, err.Error(), http.StatusBadRequest)
-			bmaError(res, fmt.Sprintf("TaskHandle: Ошибка чтения тела запроса: %s\n", err.Error()), http.StatusOK)
+			// ошибка разбора даты
+			bmaError(res, fmt.Sprintf("TH POST: Ошибка разбора даты: %v\n", err), http.StatusOK)
 			return
 		}
-		// *** лог контроль
-		fmt.Println("buf.Bytes():", buf.String())
-		// десериализуем JSON в task
-		if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
-			//http.Error(res, err.Error(), http.StatusBadRequest)
-			bmaError(res, fmt.Sprintf("TaskHandle: Ошибка десериализации: %s\n", err.Error()), http.StatusOK)
-			return
-		}
-		// лог контроль
-		fmt.Printf("Unmarshal Task Date *%s* Title *%s* Comment *%s* Repeat *%s*\n", task.Date, task.Title, task.Comment, task.Repeat)
-		// анализ входных данных
-		// Поле Title обязательное
-		if len(task.Title) == 0 {
-			bmaError(res, "TaskHandle: Поле `Задача*` пустое", http.StatusOK)
-			return
-		}
-		// Если поле date не указано или содержит пустую строку,
-		if len(task.Date) == 0 {
-			// берётся сегодняшнее число.
+	}
+	// тут валидная строка в task.Date
+	// это либо строка из текущей даты либо корректная строка
+	// вызываем NextDate(time.Now(),task.Date,task.Repeat)
+	// Если дата меньше сегодняшнего числа,  есть два варианта:
+	if task.Date < time.Now().Format("20060102") {
+		if len(task.Repeat) == 0 {
+			// 1. если правило повторения не указано или равно пустой строке,
+			// подставляется сегодняшнее число;
 			task.Date = time.Now().Format("20060102")
 		} else {
-			//  task.Date не пустое. пробуем распарсить
-			_, err = time.Parse("20060102", task.Date)
-			if err != nil {
-				// ошибка разбора даты
-				bmaError(res, fmt.Sprintf("TaskHandle: Ошибка разбора даты: %v\n", err), http.StatusOK)
-				return
-			}
-		}
-		// тут валидная строка в task.Date
-		// это либо строка из текущей даты либо корректная строка
-		// вызываем NextDate(time.Now(),task.Date,task.Repeat)
-		// Если дата меньше сегодняшнего числа,  есть два варианта:
-		if task.Date < time.Now().Format("20060102") {
-			if len(task.Repeat) == 0 {
-				// 1. если правило повторения не указано или равно пустой строке,
-				// подставляется сегодняшнее число;
-				task.Date = time.Now().Format("20060102")
-			} else {
-				// 2. при указанном правиле повторения вам нужно вычислить
-				// и записать в таблицу дату выполнения, которая будет больше
-				// сегодняшнего числа. Для этого используйте функцию NextDate(),
-				// которую вы уже написали раньше.
-				task.Date, err = NextDate(time.Now(), task.Date, task.Repeat)
-				if err != nil {
-					bmaError(res, fmt.Sprintf("NextDate: %v", err), http.StatusOK)
-					return
-				}
-			}
-		} else {
+			// 2. при указанном правиле повторения вам нужно вычислить
+			// и записать в таблицу дату выполнения, которая будет больше
+			// сегодняшнего числа. Для этого используйте функцию NextDate(),
+			// которую вы уже написали раньше.
 			task.Date, err = NextDate(time.Now(), task.Date, task.Repeat)
 			if err != nil {
 				bmaError(res, fmt.Sprintf("NextDate: %v", err), http.StatusOK)
 				return
 			}
 		}
-		fmt.Println("Добавлена в базу ", task)
-		// Task положить в базу и определить id
-		resDBEx, err := dbt.AddTask(task)
+	} else {
+		task.Date, err = NextDate(time.Now(), task.Date, task.Repeat)
 		if err != nil {
-			// оборачиваем ошибку в свою
-			bmaError(res, fmt.Sprintf("TaskHandle: Ошибка при добавлении в БД: %v\n", err), http.StatusOK)
+			bmaError(res, fmt.Sprintf("NextDate: %v", err), http.StatusOK)
 			return
 		}
-		// определить id
-		id, err := resDBEx.LastInsertId()
-		if err != nil {
-			bmaError(res, fmt.Sprintf("TaskHandle: Ошибка LastInsetId(): %v\n", err), http.StatusOK)
-			return
-		}
-		var bId bmaId
-		bId.Id = strconv.Itoa(int(id))
-		// вернуть id из базы в json
-		// кодируем id для отправки ответа
-		arrBytes, err := json.Marshal(bId)
-		if err != nil {
-			bmaError(res, fmt.Sprintf("TaskHandle: Ошибка json.Marshal(id): %v\n", err), http.StatusOK)
-			return
-		}
-		// *** лог контроль
-		fmt.Printf("ret json *%s*\n", string(arrBytes))
-		// запись результата в JSON
-		res.Header().Set("Content-Type", "application/json")
-		res.WriteHeader(http.StatusOK)
-		res.Write(arrBytes)
+	}
+	fmt.Println("Добавлена в базу ", task)
+	// Task положить в базу и определить id
+	resSql, err := dbt.AddTask(task)
+	if err != nil {
+		// оборачиваем ошибку в свою
+		bmaError(res, fmt.Sprintf("TH POST: Ошибка при добавлении в БД: %v\n", err), http.StatusOK)
+		return
+	}
+	// определить id
+	id, err := resSql.LastInsertId()
+	if err != nil {
+		bmaError(res, fmt.Sprintf("TH POST: Ошибка LastInsetId(): %v\n", err), http.StatusOK)
+		return
+	}
+	var bId bmaId
+	bId.Id = strconv.Itoa(int(id))
+	// вернуть id из базы в json
+	// кодируем id для отправки ответа
+	arrBytes, err := json.Marshal(bId)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("TH POST: Ошибка json.Marshal(id): %v\n", err), http.StatusOK)
+		return
+	}
+	// *** лог контроль
+	fmt.Printf("ret json *%s*\n", string(arrBytes))
+	// запись результата в JSON
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(arrBytes)
+}
 
+func TaskHandle(res http.ResponseWriter, req *http.Request) {
+	// одна задача
+	// запрос в строку
+	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
+	fmt.Println(s)
+	switch req.Method {
+	case "POST":
+		// добавление задачи
+		TaskPOSTHandle(res, req)
 	case "GET":
+		// пока пусток (bmaError)
+		TaskGETHandle(res, req)
+	case "DELETE":
+	}
+}
+
+func TasksHandle(res http.ResponseWriter, req *http.Request) {
+	// много задач
+	// запрос в строку
+	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
+	fmt.Println(s)
+	switch req.Method {
+	case "POST":
+		//TasksPOSTHandle(res, req)
+	case "GET":
+		TasksGETHandle(res, req)
 	case "DELETE":
 	}
 }
@@ -391,7 +514,12 @@ func NextDateMonth(now time.Time, startDate time.Time, repSlice []string) (strin
 			if checkDay(dMonth.Year(), int(dMonth.Month()), iDay) {
 				// если есть формируем дату dMonth.Year(), dMonth.Month(). iDay
 				// добавляем строкой в список дней, который потом отсортируем и выберем нужный
-				slsDays = append(slsDays, time.Date(dMonth.Year(), dMonth.Month(), iDay, 0, 0, 0, 0, time.Local).Format("20060102"))
+				if iDay < 0 {
+					dM := dMonth.AddDate(0, 1, iDay)
+					slsDays = append(slsDays, dM.Format("20060102"))
+				} else {
+					slsDays = append(slsDays, time.Date(dMonth.Year(), dMonth.Month(), iDay, 0, 0, 0, 0, time.Local).Format("20060102"))
+				}
 			}
 		}
 	}

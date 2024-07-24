@@ -38,7 +38,7 @@ CREATE INDEX idx_title ON scheduler (title);
 // CREATE UNIQUE INDEX idx_title ON scheduler (title);
 
 type Task struct {
-	// ID      int    `json:"id"`
+	ID      int    `json:"id"`
 	Date    string `json:"date"` // omitempty
 	Title   string `json:"title"`
 	Comment string `json:"comment"` // omitempty
@@ -64,13 +64,13 @@ func InitDBase() {
 	// sql-запрос с CREATE TABLE и CREATE INDEX
 	SqlDB, err = sql.Open("sqlite", envDBFile)
 	if err != nil {
-		fmt.Println("bma err:", err)
+		fmt.Println("InitDB err:", err)
 		return
 	}
 	if install {
 		// нужно создать таблицу, т к файла не было
 		if _, err = SqlDB.Exec(schemaSQL); err != nil {
-			fmt.Println(err)
+			fmt.Println("InitDB err:", err)
 		}
 	}
 
@@ -78,5 +78,6 @@ func InitDBase() {
 }
 
 func AddTask(task Task) (sql.Result, error) {
-	return SqlDB.Exec("INSERT INTO scheduler(date, title, comment, repeat) VALUES (?, ?, ?, ?) ", task.Date, task.Title, task.Comment, task.Repeat)
+	return SqlDB.Exec("INSERT INTO scheduler(date, title, comment, repeat) VALUES (?, ?, ?, ?) ",
+		task.Date, task.Title, task.Comment, task.Repeat)
 }
