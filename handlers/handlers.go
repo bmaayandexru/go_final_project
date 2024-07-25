@@ -71,17 +71,11 @@ func TasksGETSearchString(res http.ResponseWriter, req *http.Request) {
 	search = "%" + search + "%"
 	// search = strings.ToUpper(search)
 	fmt.Println(search)
-	// работает. тоже требовательно к регистру
+	// работает. тоже требовательно к регистру на русских символах
+	// на латинице всё ровно
 	rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler WHERE UPPER(title) LIKE UPPER(:search) OR UPPER(comment) LIKE UPPER(:search) ORDER BY date LIMIT :limit",
 		sql.Named("search", search),
 		sql.Named("limit", 50))
-
-	/*
-		//	РАБОТАЕТ!!! требовательно к регистру
-		rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler WHERE title LIKE :search OR comment LIKE :search ORDER BY date LIMIT :limit",
-			sql.Named("search", search),
-			sql.Named("limit", 50))
-	*/
 	if err != nil {
 		fmt.Println(err)
 		bmaError(res, fmt.Sprintf("Ts GET SS: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
@@ -210,11 +204,44 @@ func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
 }
 
 func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("GET запрос task. Не реализован")
 	// var task dbt.Task
 	// var buf bytes.Buffer
-	// получаем значение GET-параметра с именем name
-	fmt.Println("GET запрос task. Не реализован")
-	bmaError(res, "Return Error", http.StatusOK)
+	// получаем значение GET-параметра с именем id
+	//****************************************************
+	id := req.URL.Query().Get("id")
+	fmt.Printf("id *%s*\n", id)
+	// search = strings.ToUpper(search)
+	fmt.Printf("Tk GET id %s\n", id)
+	// работает. тоже требовательно к регистру на русских символах
+	// на латинице всё ровно
+	row := dbt.SqlDB.QueryRow("SELECT * FROM scheduler WHERE id = :id", sql.Named("id", id))
+	//	sTsks.Tasks = make([]dbt.Task, 0)
+
+	task := dbt.Task{}
+	err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	if err != nil {
+		fmt.Println(err)
+		bmaError(res, fmt.Sprintf("Tk GET id: Ошибка row.Scan(): %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	//	sTsks.Tasks = append(sTsks.Tasks, task)
+	fmt.Println("Считана задача: ", task)
+
+	// преборазовать в json и вернуть
+	arrBytes, err := json.Marshal(task)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("Tk GET id: Ошибка json.Marshal(sTsks): %v\n", err), http.StatusOK)
+		return
+	}
+	fmt.Printf("Tk GET id ret json *%s*\n", string(arrBytes))
+	// запись результата в JSON
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(arrBytes)
+
+	//****************************************************
+	// bmaError(res, "Tk GET Id: Return Error", http.StatusOK)
 }
 
 func TasksGETHandle(res http.ResponseWriter, req *http.Request) {
@@ -348,7 +375,7 @@ func TaskHandle(res http.ResponseWriter, req *http.Request) {
 		// добавление задачи
 		TaskPOSTHandle(res, req)
 	case "GET":
-		// пока пусток (bmaError)
+		// пока пустой (bmaError)
 		TaskGETHandle(res, req)
 	case "DELETE":
 	}
