@@ -10,7 +10,7 @@ var DBFile = "../scheduler.db"
 var DBFileRun = "scheduler.db"
 
 // если использовать одну и ту же переменную и в тестах и в коде, то тесты не проходят
-// не находит файл с базой
+// тесты не находят файл с базой
 
 // var FullNextDate = false
 var FullNextDate = true

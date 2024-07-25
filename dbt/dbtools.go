@@ -82,3 +82,18 @@ func AddTask(task Task) (sql.Result, error) {
 	return SqlDB.Exec("INSERT INTO scheduler(date, title, comment, repeat) VALUES (?, ?, ?, ?) ",
 		task.Date, task.Title, task.Comment, task.Repeat)
 }
+
+func UpdateTask(task Task) (sql.Result, error) {
+	return SqlDB.Exec("UPDATE scheduler SET  date = :date, title = :title, comment = :comment, repeat = :repeat WHERE id = :id",
+		sql.Named("id", task.ID),
+		sql.Named("date", task.Date),
+		sql.Named("title", task.Title),
+		sql.Named("comment", task.Comment),
+		sql.Named("repeat", task.Repeat))
+}
+
+func SelectID(id string) error {
+	row := SqlDB.QueryRow("SELECT * FROM scheduler WHERE id = :id", sql.Named("id", id))
+	task := Task{}
+	return row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+}

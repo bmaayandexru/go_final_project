@@ -25,6 +25,8 @@ type bmaId struct {
 	Id string `json:"id"`
 }
 
+type bmaEmpty struct{}
+
 type bmaTask struct {
 	Tasks []dbt.Task `json:"tasks"`
 }
@@ -204,11 +206,7 @@ func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
 }
 
 func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
-	fmt.Println("GET запрос task. Не реализован")
-	// var task dbt.Task
-	// var buf bytes.Buffer
 	// получаем значение GET-параметра с именем id
-	//****************************************************
 	id := req.URL.Query().Get("id")
 	fmt.Printf("id *%s*\n", id)
 	// search = strings.ToUpper(search)
@@ -216,8 +214,6 @@ func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
 	// работает. тоже требовательно к регистру на русских символах
 	// на латинице всё ровно
 	row := dbt.SqlDB.QueryRow("SELECT * FROM scheduler WHERE id = :id", sql.Named("id", id))
-	//	sTsks.Tasks = make([]dbt.Task, 0)
-
 	task := dbt.Task{}
 	err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 	if err != nil {
@@ -225,9 +221,7 @@ func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
 		bmaError(res, fmt.Sprintf("Tk GET id: Ошибка row.Scan(): %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	//	sTsks.Tasks = append(sTsks.Tasks, task)
 	fmt.Println("Считана задача: ", task)
-
 	// преборазовать в json и вернуть
 	arrBytes, err := json.Marshal(task)
 	if err != nil {
@@ -239,9 +233,6 @@ func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	res.Write(arrBytes)
-
-	//****************************************************
-	// bmaError(res, "Tk GET Id: Return Error", http.StatusOK)
 }
 
 func TasksGETHandle(res http.ResponseWriter, req *http.Request) {
@@ -265,7 +256,96 @@ func TasksGETHandle(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	bmaError(res, "Return Error", http.StatusOK)
+	// bmaError(res, "Return Error", http.StatusOK)
+}
+
+func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
+	var task dbt.Task
+	var buf bytes.Buffer
+	// читаем тело запроса
+	_, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("Tk PUT: Ошибка чтения тела запроса: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	// *** лог контроль
+	fmt.Println("PUT buf.Bytes():", buf.String())
+	// десериализуем JSON в task
+	if err = json.Unmarshal(buf.Bytes(), &task); err != nil {
+		bmaError(res, fmt.Sprintf("Tr PUT: Ошибка десериализации: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	// лог контроль
+	fmt.Printf("Unmarshal Task: ID *%s* Date *%s* Title *%s* Comment *%s* Repeat *%s*\n", task.ID, task.Date, task.Title, task.Comment, task.Repeat)
+	// анализ task.ID не пустой, это число, есть в базе,
+	if len(task.ID) == 0 { // пустой id
+		bmaError(res, fmt.Sprintln("Tr PUT: Пустой ID"), http.StatusOK)
+		return
+	}
+	_, err = strconv.Atoi(task.ID)
+	if err != nil { // id не число
+		bmaError(res, fmt.Sprintln("Tr PUT: ID не число"), http.StatusOK)
+		return
+	}
+	// тут ID число
+	err = dbt.SelectID(task.ID)
+	if err != nil { // запрос SELECT * WHERE id = :id не должен вернуть ошибку
+		bmaError(res, fmt.Sprintf("Tr PUT: ID нет в базе. Ошибка: %v\n", err), http.StatusOK)
+		return
+	}
+	// ID корректный и в базе есть
+	if len(task.Title) == 0 { // Поле Title обязательное
+		bmaError(res, "Tk PUT: Поле `Задача*` пустое", http.StatusOK)
+		return
+	}
+	if len(task.Date) == 0 { // Если поле date не указано или содержит пустую строку,
+		task.Date = time.Now().Format("20060102") // берётся сегодняшнее число.
+	} else {
+		//  task.Date не пустое. пробуем распарсить
+		_, err = time.Parse("20060102", task.Date)
+		if err != nil {
+			bmaError(res, fmt.Sprintf("Tk PUT: Ошибка разбора даты: %v\n", err), http.StatusOK)
+			return
+		}
+	}
+	// тут валидная строка в task.Date
+	if task.Date < time.Now().Format("20060102") {
+		if len(task.Repeat) == 0 {
+			task.Date = time.Now().Format("20060102")
+		} else {
+			task.Date, err = NextDate(time.Now(), task.Date, task.Repeat)
+			if err != nil {
+				bmaError(res, fmt.Sprintf("NextDate: %v", err), http.StatusOK)
+				return
+			}
+		}
+	} else {
+		task.Date, err = NextDate(time.Now(), task.Date, task.Repeat)
+		if err != nil {
+			bmaError(res, fmt.Sprintf("NextDate: %v", err), http.StatusOK)
+			return
+		}
+	}
+	fmt.Println("Изменена в базе ", task)
+	// Task перезаписать в базе и определить id
+	_, err = dbt.UpdateTask(task)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("Tк PUT: Ошибка при изменении в БД: %v\n", err), http.StatusOK)
+		return
+	}
+	// вернуть пустой json {}
+	var bE bmaEmpty
+	arrBytes, err := json.Marshal(bE)
+	if err != nil {
+		bmaError(res, fmt.Sprintf("Tk PUT: Ошибка json.Marshal(): %v\n", err), http.StatusOK)
+		return
+	}
+	// *** лог контроль
+	fmt.Printf("ret json *%s*\n", string(arrBytes))
+	// запись результата в JSON
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusOK)
+	res.Write(arrBytes)
 }
 
 func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
@@ -375,8 +455,11 @@ func TaskHandle(res http.ResponseWriter, req *http.Request) {
 		// добавление задачи
 		TaskPOSTHandle(res, req)
 	case "GET":
-		// пока пустой (bmaError)
+		// запрос для редактирование
 		TaskGETHandle(res, req)
+	case "PUT":
+		// запрос на изменение
+		TaskPUTHandle(res, req)
 	case "DELETE":
 	}
 }
