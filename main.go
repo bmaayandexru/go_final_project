@@ -12,12 +12,23 @@ import (
 
 var mux *http.ServeMux
 
+type nextDate struct {
+	date   string
+	repeat string
+	want   string
+}
+
 func main() {
+	// now=20240126
+	//{"20240202", "d 30", `20240303`},//*
+	//{"20240228", "d 1", "20240229"},
+	//{"20240126", "m 25,26,7", "20240207"}
+	//{"20230126", "w 4,5", "20240201"}
 	/*
-		//d, e := time.Parse("20060102", "20240126")
-		d := time.Now()
-		s, e := handlers.NextDate(d, "20240409", "m 1,7 2,12")
-		fmt.Printf("retstr *%s* err *%v*\n", s, e)
+		dnow, e := time.Parse("20060102", "20240126")
+		nd := nextDate{"20230126", "w 4,5", "20240201"}
+		s, e := handlers.NextDate(dnow, nd.date, nd.repeat)
+		fmt.Printf("retstr *%s* want *%s* err *%v*\n", s, nd.want, e)
 		return
 	*/
 	//***
@@ -28,6 +39,7 @@ func main() {
 	// вешаем отладочный обработчик
 	mux.HandleFunc("/api/nextdate", handlers.NextDateHandle)
 	mux.HandleFunc("/api/task", handlers.TaskHandle)
+	mux.HandleFunc("/api/task/done", handlers.TaskDoneHandle)
 	mux.HandleFunc("/api/tasks", handlers.TasksHandle)
 	// запуск файлового сервера в подкаталоге web
 	mux.Handle("/", http.FileServer(http.Dir("web/")))
