@@ -38,7 +38,6 @@ CREATE INDEX idx_title ON scheduler (title);
 // CREATE UNIQUE INDEX idx_title ON scheduler (title);
 
 type Task struct {
-	//	ID      int    `json:"id"`
 	ID      string `json:"id"`
 	Date    string `json:"date"` // omitempty
 	Title   string `json:"title"`
@@ -50,31 +49,24 @@ var SqlDB *sql.DB
 
 func InitDBase() {
 	fmt.Println("Init Data Base...")
-	//fmt.Println("settings DBFile", tests.DBFile)
 	envDBFile := os.Getenv("TODO_DBFILE")
-	//fmt.Println("enviroment DBFile ", envDBFile)
 	if envDBFile == "" {
 		envDBFile = tests.DBFileRun
 	}
 	fmt.Println("Result DBFile ", envDBFile)
 	_, err := os.Stat(envDBFile)
-	//	var install bool
 	install := (err != nil)
 	fmt.Println("Need install ", install)
-	// если install равен true, после открытия БД требуется выполнить
-	// sql-запрос с CREATE TABLE и CREATE INDEX
 	SqlDB, err = sql.Open("sqlite", envDBFile)
 	if err != nil {
 		fmt.Println("InitDB err:", err)
 		return
 	}
 	if install {
-		// нужно создать таблицу, т к файла не было
 		if _, err = SqlDB.Exec(schemaSQL); err != nil {
 			fmt.Println("InitDB err:", err)
 		}
 	}
-
 	// defer sqlDB.Close()
 }
 

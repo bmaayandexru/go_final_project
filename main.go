@@ -12,12 +12,13 @@ import (
 
 var mux *http.ServeMux
 
-type nextDate struct {
-	date   string
-	repeat string
-	want   string
-}
-
+/*
+	type nextDate struct {
+		date   string
+		repeat string
+		want   string
+	}
+*/
 func main() {
 	// now=20240126
 	//{"20240202", "d 30", `20240303`},//*
@@ -33,23 +34,18 @@ func main() {
 	*/
 	//***
 	dbt.InitDBase()
-	// лог-контроль
-	fmt.Println("Запускаем сервер")
 	mux = http.NewServeMux()
-	// вешаем отладочный обработчик
+
 	mux.HandleFunc("/api/nextdate", handlers.NextDateHandle)
 	mux.HandleFunc("/api/task", handlers.TaskHandle)
 	mux.HandleFunc("/api/task/done", handlers.TaskDoneHandle)
 	mux.HandleFunc("/api/tasks", handlers.TasksHandle)
-	// запуск файлового сервера в подкаталоге web
 	mux.Handle("/", http.FileServer(http.Dir("web/")))
-	// определение порта прослушки
 	strPort := defStrPort()
 	err := http.ListenAndServe(strPort, mux)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Завершаем работу")
 }
 
 func defStrPort() string {
@@ -57,20 +53,13 @@ func defStrPort() string {
 	// переменая tests.Port из settings.go
 	settingsStrPort := fmt.Sprintf("%d", tests.Port)
 	// лог-контроль
-	fmt.Printf("settingdStrPort *%s* \n", settingsStrPort)
 	if settingsStrPort != "" {
-		// значение не пустое. переобределяем
 		defPort = settingsStrPort
 	}
-	// порт из переменной окружения TODO_PORT. задание со *
 	envStrPort := os.Getenv("TODO_PORT")
-	// лог-контроль
-	fmt.Printf("envPort *%s* \n", envStrPort)
 	if envStrPort != "" {
-		// значение не пустое. переобределяем
 		defPort = envStrPort
 	}
-	// итоговое значение
 	fmt.Printf("Set port %s \n", defPort)
 	return ":" + defPort
 }
