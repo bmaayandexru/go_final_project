@@ -357,7 +357,9 @@ func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 	} else { // правила повторения нет
-		task.Date = nows
+		if task.Date < nows { // дата меньше сегодняшней
+			task.Date = nows
+		}
 	}
 	fmt.Println("Ts POST: задача добавлена в базу ", task)
 	resSql, err := dbt.AddTask(task)
