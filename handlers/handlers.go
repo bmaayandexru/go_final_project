@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,6 +31,19 @@ type bmaId struct {
 	Id string `json:"id"`
 }
 
+// для формирования строки
+type bmaPwd struct {
+	Password string `json:"password"`
+}
+
+const (
+	CPassword = "12111"
+)
+
+type bmaToken struct {
+	Token string `json:"token"`
+}
+
 // для формирования "пустышки"
 type bmaEmpty struct{}
 
@@ -39,18 +55,9 @@ type bmaTask struct {
 var sTasks bmaTask
 
 func NextDateHandle(res http.ResponseWriter, req *http.Request) {
-	/*
-		// лог-контроль
-		fmt.Println("Получен запрос api/nextdate ")
-		// запрос в строку
-		s := fmt.Sprintf("Host: %s Path: %s Method: %s", req.Host, req.URL.Path, req.Method)
-		// лог-контроль
-		fmt.Println(s)
-	*/
 	strNow := req.FormValue("now")
 	strDate := req.FormValue("date")
 	strRepeat := req.FormValue("repeat")
-	//fmt.Printf("now *%s* date *%s* repeat *%s*\n", strNow, strDate, strRepeat)
 	now, err := time.Parse("20060102", strNow)
 	if err != nil {
 		return
@@ -509,6 +516,71 @@ func TasksHandle(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	bmaError(res, "Нужен только GET запрос", http.StatusOK)
+}
+
+func SignInPOSTHandle(res http.ResponseWriter, req *http.Request) {
+	fmt.Println("Запрос на авторизацию")
+	var buf bytes.Buffer
+	//var err error
+	//var bId bmaId
+	var pwds bmaPwd
+	// читаем тело запроса
+	if _, err := buf.ReadFrom(req.Body); err != nil {
+		bmaError(res, fmt.Sprintf("Si POST: Ошибка чтения тела запроса: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	// *** лог контроль
+	fmt.Println("Si POST: buf.Bytes():", buf.String())
+	// десериализуем JSON в task
+	if err := json.Unmarshal(buf.Bytes(), &pwds); err != nil {
+		bmaError(res, fmt.Sprintf("Si POST: Ошибка десериализации: %s\n", err.Error()), http.StatusOK)
+		return
+	}
+	// лог контроль
+	fmt.Printf("Si POST: Unmarshal password *%s* \n", pwds.Password)
+	// Функция должна сверять указанный пароль с хранимым в переменной окружения TODO_PASSWORD.
+	// Если они совпадают, нужно сформировать JWT-токен и возвратить его в поле token JSON-объекта.
+	envPassword := os.Getenv("TODO_DBFILE")
+	if envPassword == "" {
+		envPassword = CPassword
+	}
+
+	if pwds.Password == envPassword {
+		// при совпадении паролей SignInPOSHHandler возвращает в res token,
+		// который frondend пишет в куки и который потом из куки используется для авторизации.
+		// settings.Token нужно указывать только для тестирования алгоритма авторизации
+		// Процесс смены пароля:
+		// 1. Меняем CPassword
+		// 2. Заходим из браузера с паролем из CPassword
+		// 3. Из ответа сервера хэш копипастим в settings.Token для тетирования авторизации
+		var tkn bmaToken
+		tkn.Token = JwtFromPass(envPassword)
+		aBytes, _ := json.Marshal(tkn)
+		// *** лог контроль
+		fmt.Printf("Si POST: Marshal Token *%s*\n", string(aBytes))
+		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusOK)
+		res.Write(aBytes)
+		return
+	}
+	// Если пароль неверный или произошла ошибка, возвращается JSON c текстом ошибки в поле error.
+	bmaError(res, "Пароль не верный", http.StatusUnauthorized)
+}
+
+func JwtFromPass(pass string) string {
+	result := sha256.Sum256([]byte(pass))
+	return hex.EncodeToString(result[:])
+}
+
+func SignInHandle(res http.ResponseWriter, req *http.Request) {
+	// авторизация (api/sign)
+	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
+	fmt.Println(s)
+	if req.Method == "POST" {
+		SignInPOSTHandle(res, req)
+		return
+	}
+	bmaError(res, "Нужен только POST запрос", http.StatusOK)
 }
 
 // функция пересчета следующей даты
