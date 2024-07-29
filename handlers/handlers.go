@@ -540,7 +540,8 @@ func SignInPOSTHandle(res http.ResponseWriter, req *http.Request) {
 	fmt.Printf("Si POST: Unmarshal password *%s* \n", pwds.Password)
 	// Функция должна сверять указанный пароль с хранимым в переменной окружения TODO_PASSWORD.
 	// Если они совпадают, нужно сформировать JWT-токен и возвратить его в поле token JSON-объекта.
-	envPassword := os.Getenv("TODO_DBFILE")
+	envPassword := os.Getenv("TODO_PASSWORD")
+	fmt.Printf("Si POST env password *%s*\n", envPassword)
 	if envPassword == "" {
 		envPassword = CPassword
 	}

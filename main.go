@@ -33,6 +33,7 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// смотрим наличие пароля
 		pass := os.Getenv("TODO_PASSWORD")
+		fmt.Printf("env password *%s*\n", pass)
 		// авторизация будет проверяться только при наличии TODO_PASSWORD
 		// иначе не будет
 		if len(pass) == 0 {
@@ -72,6 +73,7 @@ func defStrPort() string {
 		defPort = settingsStrPort
 	}
 	envStrPort := os.Getenv("TODO_PORT")
+	fmt.Printf("env port *%s* \n", envStrPort)
 	if envStrPort != "" {
 		defPort = envStrPort
 	}
