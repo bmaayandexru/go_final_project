@@ -1,0 +1,21 @@
+version: '3.0'
+
+services:
+  app:
+#    image: golang:1.22.1
+    image: alpine:latest
+    container_name: gfp_dc
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+#    environment:
+#      - TODO_DBFILE=${TODO_DBFILE}
+#      - TODO_PORT=${TODO_PORT}
+#      - TODO_PASSWORD=${TODO_PASSWORD}
+    ports:
+      - "${TODO_PORT}:${TODO_PORT}"
+    volumes:
+      - .:/app
+    command: ["./main"]

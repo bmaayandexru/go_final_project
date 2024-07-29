@@ -12,13 +12,6 @@ import (
 
 var mux *http.ServeMux
 
-/*
-	type nextDate struct {
-		date   string
-		repeat string
-		want   string
-	}
-*/
 func main() {
 	dbt.InitDBase()
 	mux = http.NewServeMux()
