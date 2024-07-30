@@ -15,7 +15,6 @@ var mux *http.ServeMux
 func main() {
 	dbt.InitDBase()
 	mux = http.NewServeMux()
-
 	mux.HandleFunc("/api/nextdate", handlers.NextDateHandle)
 	mux.HandleFunc("/api/task", auth(handlers.TaskHandle))
 	mux.HandleFunc("/api/task/done", auth(handlers.TaskDoneHandle))
