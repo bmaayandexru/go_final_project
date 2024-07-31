@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -46,6 +47,7 @@ type Task struct {
 }
 
 var SqlDB *sql.DB
+var StrDBFile string
 
 func InitDBase() {
 	fmt.Println("Init Data Base...")
@@ -57,7 +59,8 @@ func InitDBase() {
 	_, err := os.Stat(envDBFile)
 	install := (err != nil)
 	fmt.Println("Need install ", install)
-	SqlDB, err = sql.Open("sqlite", envDBFile)
+	StrDBFile = envDBFile
+	SqlDB, err = sql.Open("sqlite", StrDBFile)
 	if err != nil {
 		fmt.Println("InitDB err:", err)
 		return
@@ -67,15 +70,19 @@ func InitDBase() {
 			fmt.Println("InitDB err:", err)
 		}
 	}
-	// defer sqlDB.Close()
+	defer SqlDB.Close()
 }
 
 func AddTask(task Task) (sql.Result, error) {
+	SqlDB, _ = sql.Open("sqlite", StrDBFile)
+	defer SqlDB.Close()
 	return SqlDB.Exec("INSERT INTO scheduler(date, title, comment, repeat) VALUES (?, ?, ?, ?) ",
 		task.Date, task.Title, task.Comment, task.Repeat)
 }
 
 func UpdateTask(task Task) (sql.Result, error) {
+	SqlDB, _ = sql.Open("sqlite", StrDBFile)
+	defer SqlDB.Close()
 	return SqlDB.Exec("UPDATE scheduler SET  date = :date, title = :title, comment = :comment, repeat = :repeat WHERE id = :id",
 		sql.Named("id", task.ID),
 		sql.Named("date", task.Date),
@@ -84,8 +91,42 @@ func UpdateTask(task Task) (sql.Result, error) {
 		sql.Named("repeat", task.Repeat))
 }
 
-func SelectID(id string) error {
+func SelectByID(id string) (Task, error) {
+	SqlDB, _ = sql.Open("sqlite", StrDBFile)
+	defer SqlDB.Close()
 	row := SqlDB.QueryRow("SELECT * FROM scheduler WHERE id = :id", sql.Named("id", id))
 	task := Task{}
-	return row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	err := row.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+	return task, err
+}
+
+// запрос по дате
+func QueryByDate(date time.Time) (*sql.Rows, error) {
+	SqlDB, _ = sql.Open("sqlite", StrDBFile)
+	defer SqlDB.Close()
+	return SqlDB.Query("SELECT * FROM scheduler WHERE date = :date LIMIT :limit",
+		sql.Named("date", date.Format("20060102")),
+		sql.Named("limit", 50))
+}
+
+func QueryByString(search string) (*sql.Rows, error) {
+	SqlDB, _ = sql.Open("sqlite", StrDBFile)
+	defer SqlDB.Close()
+	search = "%" + search + "%"
+	return SqlDB.Query("SELECT * FROM scheduler WHERE UPPER(title) LIKE UPPER(:search) OR UPPER(comment) LIKE UPPER(:search) ORDER BY date LIMIT :limit",
+		sql.Named("search", search),
+		sql.Named("limit", 50))
+}
+
+// запрос всех задач
+func QueryAllTasks() (*sql.Rows, error) {
+	SqlDB, _ = sql.Open("sqlite", StrDBFile)
+	defer SqlDB.Close()
+	return SqlDB.Query("SELECT * FROM scheduler ORDER BY date LIMIT :limit", sql.Named("limit", 50))
+}
+
+func DeleteByID(id string) (sql.Result, error) {
+	SqlDB, _ = sql.Open("sqlite", StrDBFile)
+	defer SqlDB.Close()
+	return SqlDB.Exec("DELETE FROM scheduler WHERE id = :id", sql.Named("id", id))
 }

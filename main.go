@@ -48,11 +48,9 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 			}
 			var valid bool
 			jwtp := handlers.JwtFromPass(pass)
-			fmt.Printf("auth: jwt pass *%s*\n", jwtp)
 			// здесь код для валидации и проверки JWT-токена
-			fmt.Println("auth: cookie jwt", jwt)
 			valid = (jwt == jwtp)
-			//valid = (jwt == tests.Token)
+			fmt.Println("auth valid: ", valid)
 			if !valid {
 				// возвращаем ошибку авторизации 401
 				http.Error(w, "Authentification required", http.StatusUnauthorized)
