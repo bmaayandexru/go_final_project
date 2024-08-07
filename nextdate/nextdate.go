@@ -37,10 +37,9 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		return NextDay(now, startDate, repSlice)
 	case "y": // y год
 		return NextYear(now, startDate, repSlice)
-	case "w":
+	case "w": // w дни недели
 		return NextWeekDay(now, startDate, repSlice)
-	case "m":
-		// m дни месяца
+	case "m": // m дни месяца
 		return NextDateMonth(now, startDate, repSlice)
 	} // switch
 	return "", errors.New("не удалось определить следующую дату")
@@ -159,9 +158,9 @@ func NextDateMonth(now time.Time, startDate time.Time, repSlice []string) (strin
 				// добавляем строкой в список дней, который потом отсортируем и выберем нужный
 				if iDay < 0 {
 					dM := dMonth.AddDate(0, 1, iDay)
-					slsDays = append(slsDays, dM.Format("20060102"))
+					slsDays = append(slsDays, dM.Format(template))
 				} else {
-					slsDays = append(slsDays, time.Date(dMonth.Year(), dMonth.Month(), iDay, 0, 0, 0, 0, time.Local).Format("20060102"))
+					slsDays = append(slsDays, time.Date(dMonth.Year(), dMonth.Month(), iDay, 0, 0, 0, 0, time.Local).Format(template))
 				}
 			}
 		}
@@ -173,7 +172,7 @@ func NextDateMonth(now time.Time, startDate time.Time, repSlice []string) (strin
 	sort.Strings(slsDays)
 	// выбираем нужный день и возвращаем
 	for _, sDay := range slsDays {
-		dDay, _ := time.Parse("20060102", sDay)
+		dDay, _ := time.Parse(template, sDay)
 		if now.Before(dDay) {
 			return sDay, nil
 		}

@@ -1,33 +1,51 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
 
 	"github.com/bmaayandexru/go_final_project/dbt"
 	"github.com/bmaayandexru/go_final_project/handlers"
+	"github.com/bmaayandexru/go_final_project/service"
 	"github.com/bmaayandexru/go_final_project/tests"
 )
 
-var mux *http.ServeMux
+var (
+	mux *http.ServeMux
+	DB  *sql.DB
+	err error
+)
 
 func main() {
-	dbt.InitDBase()
+	// открытие БД
+	if DB, err = dbt.InitDBase(); err != nil {
+		fmt.Printf("Ошибка открытия базы %v\n", err)
+		panic(err)
+	}
+	defer DB.Close()
+	// инициализация сервиса и хранилища
+	service.InitStoreAndService(DB)
+	// поднимаем сервер
 	mux = http.NewServeMux()
+	// вешаем обработчики
 	mux.HandleFunc("/api/nextdate", handlers.NextDateHandle)
 	mux.HandleFunc("/api/task", auth(handlers.TaskHandle))
 	mux.HandleFunc("/api/task/done", auth(handlers.TaskDoneHandle))
 	mux.HandleFunc("/api/tasks", auth(handlers.TasksHandle))
 	mux.HandleFunc("/api/signin", handlers.SignInHandle)
+	// обеспечиваем интерфейс
 	mux.Handle("/", http.FileServer(http.Dir("web/")))
 	strPort := defStrPort()
-	err := http.ListenAndServe(strPort, mux)
+	// пускаем сервер
+	err = http.ListenAndServe(strPort, mux)
 	if err != nil {
 		panic(err)
 	}
 }
 
+// auth(...) - проверяет аутентификацию
 func auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// смотрим наличие пароля
@@ -61,11 +79,11 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+// defStrPort() - определение номера порта. возвращает строку
 func defStrPort() string {
 	defPort := "7540"
 	// переменая tests.Port из settings.go
 	settingsStrPort := fmt.Sprintf("%d", tests.Port)
-	// лог-контроль
 	if settingsStrPort != "" {
 		defPort = settingsStrPort
 	}

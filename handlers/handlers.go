@@ -12,8 +12,8 @@ import (
 	"time"
 
 	dbt "github.com/bmaayandexru/go_final_project/dbt"
-	"github.com/bmaayandexru/go_final_project/dbt/nextdate"
-	nd "github.com/bmaayandexru/go_final_project/dbt/nextdate"
+	nd "github.com/bmaayandexru/go_final_project/nextdate"
+	"github.com/bmaayandexru/go_final_project/service"
 )
 
 // для формирования ошибки
@@ -33,6 +33,7 @@ type strcPwd struct {
 
 const (
 	CPassword = "12111"
+	template  = "20060102"
 )
 
 type strcToken struct {
@@ -53,7 +54,7 @@ func NextDateHandle(res http.ResponseWriter, req *http.Request) {
 	strNow := req.FormValue("now")
 	strDate := req.FormValue("date")
 	strRepeat := req.FormValue("repeat")
-	now, err := time.Parse("20060102", strNow)
+	now, err := time.Parse(template, strNow)
 	if err != nil {
 		return
 	}
@@ -61,7 +62,7 @@ func NextDateHandle(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	res.Write([]byte(retStr))
+	_, _ = res.Write([]byte(retStr))
 }
 
 func retError(res http.ResponseWriter, sErr string, statusCode int) {
@@ -73,19 +74,19 @@ func retError(res http.ResponseWriter, sErr string, statusCode int) {
 	fmt.Println("retError: aBytes ", string(aBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(statusCode)
-	res.Write(aBytes)
+	_, _ = res.Write(aBytes)
 }
 
-func TasksGETSearchString(res http.ResponseWriter, req *http.Request) {
+func TasksGETSearch(res http.ResponseWriter, req *http.Request) {
 	search := req.URL.Query().Get("search")
 	fmt.Printf("Строка *%s*\n", search)
-	rows, err := dbt.QueryByString(search)
+	// нашли строку
+	rows, err := service.Service.Find(search)
 	if err != nil {
 		fmt.Println(err)
 		retError(res, fmt.Sprintf("Ts GET SS: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	defer rows.Close()
 	sTasks.Tasks = make([]dbt.Task, 0)
 	for rows.Next() {
 		task := dbt.Task{}
@@ -109,58 +110,16 @@ func TasksGETSearchString(res http.ResponseWriter, req *http.Request) {
 	}
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
-}
-
-func TasksGETSearchDate(res http.ResponseWriter, req *http.Request) {
-	search := req.URL.Query().Get("search")
-	date, _ := time.Parse("02.01.2006", search)
-	fmt.Printf("Дата %v\n", date)
-	rows, err := dbt.QueryByDate(date)
-	if err != nil {
-		fmt.Println(err)
-		retError(res, fmt.Sprintf("Ts GET SD: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
-		return
-	}
-	defer rows.Close()
-	sTasks.Tasks = make([]dbt.Task, 0)
-	for rows.Next() {
-		task := dbt.Task{}
-		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
-		if err != nil {
-			fmt.Println(err)
-			retError(res, fmt.Sprintf("Ts GET SD: Ошибка rows.Scan(): %s\n", err.Error()), http.StatusOK)
-			return
-		}
-		sTasks.Tasks = append(sTasks.Tasks, task)
-	}
-	if err := rows.Err(); err != nil {
-		fmt.Println(err)
-		retError(res, fmt.Sprintf("Ts GET SD: Ошибка rows.Next(): %s\n", err.Error()), http.StatusOK)
-		return
-	}
-	arrBytes, err := json.Marshal(sTasks)
-	if err != nil {
-		retError(res, fmt.Sprintf("TH GET SD: Ошибка json.Marshal(sTsks): %v\n", err), http.StatusOK)
-		return
-	}
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
+	_, _ = res.Write(arrBytes)
 }
 
 func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
-	//fmt.Println("Вывести все задачи")
-	rows, err := dbt.QueryAllTasks() // *** DBT ADD ***
-	//dbt.SqlDB, _ = sql.Open("sqlite", dbt.StrDBFile)
-	//defer dbt.SqlDB.Close()
-	//rows, err := dbt.SqlDB.Query("SELECT * FROM scheduler ORDER BY date LIMIT :limit", sql.Named("limit", 50))
+	rows, err := service.Service.QueryAllTasks()
 	if err != nil {
 		fmt.Println(err)
 		retError(res, fmt.Sprintf("Ts GET AT: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	defer rows.Close()
 	sTasks.Tasks = make([]dbt.Task, 0)
 	for rows.Next() {
 		task := dbt.Task{}
@@ -184,14 +143,13 @@ func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
 	}
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
+	_, _ = res.Write(arrBytes)
 }
 
 func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
-	// получаем значение GET-параметра с именем id
 	id := req.URL.Query().Get("id")
 	fmt.Printf("Tk GET id %s\n", id)
-	task, err := dbt.SelectByID(id)
+	task, err := service.Service.Select(id)
 	if err != nil {
 		fmt.Println(err)
 		retError(res, fmt.Sprintf("Tk GET id: Ошибка row.Scan(): %s\n", err.Error()), http.StatusOK)
@@ -206,7 +164,7 @@ func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
 	fmt.Printf("Tk GET id ret json *%s*\n", string(arrBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
+	_, _ = res.Write(arrBytes)
 }
 
 func TasksGETHandle(res http.ResponseWriter, req *http.Request) {
@@ -215,16 +173,10 @@ func TasksGETHandle(res http.ResponseWriter, req *http.Request) {
 	if len(search) == 0 { // вывести все задачи
 		TasksGETAllTasks(res, req)
 		return
-	} else {
+	} else { // поиск по дате или строке
 		fmt.Printf("Search *%s*\n", search)
-		_, e := time.Parse("02.01.2006", search)
-		if e == nil { // это дата
-			TasksGETSearchDate(res, req)
-			return
-		} else { // не получилось - ищем строку в title лил comment
-			TasksGETSearchString(res, req)
-			return
-		}
+		TasksGETSearch(res, req)
+		return
 	}
 }
 
@@ -240,8 +192,6 @@ func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Tk PUT: Ошибка десериализации: %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	// лог контроль
-	fmt.Printf("Tk PUT Unmarshal Task: ID *%s* Date *%s* Title *%s* Comment *%s* Repeat *%s*\n", task.ID, task.Date, task.Title, task.Comment, task.Repeat)
 	// анализ task.ID не пустой, это число, есть в базе,
 	if len(task.ID) == 0 { // пустой id
 		retError(res, fmt.Sprintln("Tk PUT: Пустой ID"), http.StatusOK)
@@ -253,7 +203,7 @@ func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// тут ID строка
-	_, err = dbt.SelectByID(task.ID)
+	_, err = service.Service.Select(task.ID)
 	if err != nil { // запрос SELECT * WHERE id = :id не должен вернуть ошибку
 		retError(res, fmt.Sprintf("Tk PUT: ID нет в базе. Ошибка: %v\n", err), http.StatusOK)
 		return
@@ -264,21 +214,21 @@ func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if len(task.Date) == 0 { // Если поле date не указано или содержит пустую строку,
-		task.Date = time.Now().Format("20060102") // берётся сегодняшнее число.
+		task.Date = time.Now().Format(template) // берётся сегодняшнее число.
 	} else {
 		//  task.Date не пустое. пробуем распарсить
-		_, err = time.Parse("20060102", task.Date)
+		_, err = time.Parse(template, task.Date)
 		if err != nil {
 			retError(res, fmt.Sprintf("Tk PUT: Ошибка разбора даты: %v\n", err), http.StatusOK)
 			return
 		}
 	}
 	// тут валидная строка в task.Date
-	if task.Date < time.Now().Format("20060102") {
+	if task.Date < time.Now().Format(template) {
 		if len(task.Repeat) == 0 {
-			task.Date = time.Now().Format("20060102")
+			task.Date = time.Now().Format(template)
 		} else {
-			task.Date, err = nextdate.NextDate(time.Now(), task.Date, task.Repeat)
+			task.Date, err = nd.NextDate(time.Now(), task.Date, task.Repeat)
 			if err != nil {
 				retError(res, fmt.Sprintf("Tk PUT: Ошибка NextDate: %v", err), http.StatusOK)
 				return
@@ -292,12 +242,11 @@ func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 	// Task перезаписать в базе
-	_, err = dbt.UpdateTask(task)
+	_, err = service.Service.Update(task)
 	if err != nil {
 		retError(res, fmt.Sprintf("Tк PUT: Ошибка при изменении в БД: %v\n", err), http.StatusOK)
 		return
 	}
-	fmt.Println("Изменена в базе ", task)
 	// всё отлично. возвращем пустышку
 	var bE strcEmpty
 	arrBytes, err := json.Marshal(bE)
@@ -305,11 +254,9 @@ func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Tk PUT: Ошибка json.Marshal(bE): %v\n", err), http.StatusOK)
 		return
 	}
-	// *** лог контроль
-	fmt.Printf("Tk PUT: ret json *%s*\n", string(arrBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
+	_, _ = res.Write(arrBytes)
 }
 
 func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
@@ -328,28 +275,26 @@ func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Tr POST: Ошибка десериализации: %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	// лог контроль
-	fmt.Printf("Tr POST: Unmarshal Task Date *%s* Title *%s* Comment *%s* Repeat *%s*\n", task.Date, task.Title, task.Comment, task.Repeat)
 	if len(task.Title) == 0 { // Поле Title обязательное
 		retError(res, "Ts POST: Поле `Задача*` пустое", http.StatusOK)
 		return
 	}
 	// Если поле date содержит пустую строку,
 	if len(task.Date) == 0 { // берётся сегодняшнее число.
-		task.Date = time.Now().Format("20060102")
+		task.Date = time.Now().Format(template)
 	} else { //  task.Date не пустое. пробуем распарсить
-		if _, err := time.Parse("20060102", task.Date); err != nil {
+		if _, err := time.Parse(template, task.Date); err != nil {
 			retError(res, fmt.Sprintf("Ts POST: Ошибка разбора даты: %v\n", err), http.StatusOK)
 			return
 		}
 	}
 	// тут валидная строка в task.Date
 	// это либо строка из текущей даты либо корректная строка
-	nows := time.Now().Format("20060102")
+	nows := time.Now().Format(template)
 	if len(task.Repeat) > 0 {
 		if task.Date < nows { // правило есть и дата меньше сегодняшней
-			tn, _ := time.Parse("20060102", nows)
-			if task.Date, err = nextdate.NextDate(tn, task.Date, task.Repeat); err != nil {
+			tn, _ := time.Parse(template, nows)
+			if task.Date, err = nd.NextDate(tn, task.Date, task.Repeat); err != nil {
 				retError(res, fmt.Sprintf("Ts POST: Ошибка NextDate: %v", err), http.StatusOK)
 				return
 			}
@@ -359,8 +304,7 @@ func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
 			task.Date = nows
 		}
 	}
-	fmt.Println("Ts POST: задача добавлена в базу ", task)
-	resSql, err := dbt.AddTask(task)
+	resSql, err := service.Service.Add(task)
 	if err != nil {
 		retError(res, fmt.Sprintf("Ts POST: Ошибка при добавлении в БД: %v\n", err), http.StatusOK)
 		return
@@ -376,15 +320,12 @@ func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Ts POST: Ошибка json.Marshal(id): %v\n", err), http.StatusOK)
 		return
 	}
-	// *** лог контроль
-	fmt.Printf("Ts POST:ret json *%s*\n", string(arrBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
+	_, _ = res.Write(arrBytes)
 }
 
 func TaskDELETEHandle(res http.ResponseWriter, req *http.Request) {
-	fmt.Println("запрос task DELETE")
 	// получить id
 	id := req.URL.Query().Get("id")
 	fmt.Printf("Tk DELETE id %s\n", id)
@@ -397,15 +338,12 @@ func TaskDELETEHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, "Tk DELETE. id не число", http.StatusOK)
 		return
 	}
-	if _, err := dbt.SelectByID(id); err != nil {
+	if _, err := service.Service.Select(id); err != nil {
 		retError(res, fmt.Sprintf("Tk DELETE: id нет в базе. %s", err.Error()), http.StatusOK)
 		return
 	}
 	// удалить по id
-	_, err := dbt.DeleteByID(id) // *** DBT ADD ***
-	//dbt.SqlDB, _ = sql.Open("sqlite", dbt.StrDBFile)
-	//defer dbt.SqlDB.Close()
-	//_, err := dbt.SqlDB.Exec("DELETE FROM scheduler WHERE id = :id", sql.Named("id", id))
+	_, err := service.Service.Delete(id)
 	if err != nil {
 		retError(res, fmt.Sprintf("Tk DELETE: id: Ошибка удаления из базы: %s\n", err.Error()), http.StatusOK)
 		return
@@ -416,18 +354,13 @@ func TaskDELETEHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Tk DELETE: Ошибка json.Marshal(): %v\n", err), http.StatusOK)
 		return
 	}
-	// *** лог контроль
-	fmt.Printf("Tk DELETE: ret json *%s*\n", string(arrBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
+	_, _ = res.Write(arrBytes)
 }
 
 func TaskHandle(res http.ResponseWriter, req *http.Request) {
 	// одна задача
-	// запрос в строку
-	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
-	fmt.Println(s)
 	switch req.Method {
 	case "POST": // добавление задачи
 		TaskPOSTHandle(res, req)
@@ -441,20 +374,17 @@ func TaskHandle(res http.ResponseWriter, req *http.Request) {
 }
 
 func TaskDonePOSTHandle(res http.ResponseWriter, req *http.Request) {
-	var bE strcEmpty
 	// задача выполнена
-	fmt.Println("запрос task/done POST задача выполнена")
 	id := req.URL.Query().Get("id")
 	fmt.Printf("Tkd POST id %s\n", id)
-	task, err := dbt.SelectByID(id)
+	task, err := service.Service.Select(id)
 	if err != nil {
 		fmt.Println(err)
 		retError(res, fmt.Sprintf("Tkd POST id: Ошибка row.Scan(): %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	fmt.Println("Считана задача: ", task)
 	if len(task.Repeat) == 0 {
-		_, err = dbt.DeleteByID(task.ID) // *** DBT ADD ***
+		_, err = service.Service.Delete(task.ID)
 		if err != nil {
 			retError(res, fmt.Sprintf("Tkd POST id: Ошибка удаления из базы: %s\n", err.Error()), http.StatusOK)
 			return
@@ -462,8 +392,8 @@ func TaskDonePOSTHandle(res http.ResponseWriter, req *http.Request) {
 	} else { // при наличии правила повторения переназначение даты и UPDATE
 		dnow := time.Now()
 		dnow = dnow.AddDate(0, 0, 1)
-		if dnow.Format("20060102") < task.Date {
-			dnow, _ = time.Parse("20060102", task.Date)
+		if dnow.Format(template) < task.Date {
+			dnow, _ = time.Parse(template, task.Date)
 			dnow = dnow.AddDate(0, 0, 1)
 		}
 		newDate, err := nd.NextDate(dnow, task.Date, task.Repeat)
@@ -472,11 +402,12 @@ func TaskDonePOSTHandle(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		task.Date = newDate
-		if _, err = dbt.UpdateTask(task); err != nil {
+		if _, err = service.Service.Update(task); err != nil {
 			retError(res, fmt.Sprintf("Tkd POST: Ошибка UpdateTask(): %s\n", err.Error()), http.StatusOK)
 			return
 		}
 	}
+	var bE strcEmpty
 	arrBytes, err := json.Marshal(bE)
 	if err != nil {
 		retError(res, fmt.Sprintf("Tkd POST: Ошибка json.Marshal(): %v\n", err), http.StatusOK)
@@ -485,13 +416,11 @@ func TaskDonePOSTHandle(res http.ResponseWriter, req *http.Request) {
 	fmt.Printf("Tkd POST: ret json *%s*\n", string(arrBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	res.Write(arrBytes)
+	_, _ = res.Write(arrBytes)
 }
 
 func TaskDoneHandle(res http.ResponseWriter, req *http.Request) {
 	// одна задача (api/task/done)
-	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
-	fmt.Println(s)
 	if req.Method == "POST" {
 		TaskDonePOSTHandle(res, req)
 		return
@@ -501,8 +430,6 @@ func TaskDoneHandle(res http.ResponseWriter, req *http.Request) {
 
 func TasksHandle(res http.ResponseWriter, req *http.Request) {
 	// много задач (api/tasks)
-	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
-	fmt.Println(s)
 	if req.Method == "GET" {
 		TasksGETHandle(res, req)
 		return
@@ -524,12 +451,9 @@ func SignInPOSTHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Si POST: Ошибка десериализации: %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	// лог контроль
-	fmt.Printf("Si POST: Unmarshal password *%s* \n", pwds.Password)
 	// Функция должна сверять указанный пароль с хранимым в переменной окружения TODO_PASSWORD.
 	// Если они совпадают, нужно сформировать JWT-токен и возвратить его в поле token JSON-объекта.
 	envPassword := os.Getenv("TODO_PASSWORD")
-	fmt.Printf("Si POST env password *%s*\n", envPassword)
 	if envPassword == "" {
 		// пароля в окружении нет. приваиваем свой
 		envPassword = CPassword
@@ -545,11 +469,9 @@ func SignInPOSTHandle(res http.ResponseWriter, req *http.Request) {
 		var tkn strcToken
 		tkn.Token = JwtFromPass(envPassword)
 		aBytes, _ := json.Marshal(tkn)
-		// *** лог контроль
-		fmt.Printf("Si POST: Marshal Token *%s*\n", string(aBytes))
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
-		res.Write(aBytes)
+		_, _ = res.Write(aBytes)
 		return
 	}
 	// Если пароль неверный или произошла ошибка, возвращается JSON c текстом ошибки в поле error.
@@ -563,8 +485,6 @@ func JwtFromPass(pass string) string {
 
 func SignInHandle(res http.ResponseWriter, req *http.Request) {
 	// авторизация (api/signin)
-	s := fmt.Sprintf("Получен запрос H: %s Path: %s M: %s", req.Host, req.URL.Path, req.Method)
-	fmt.Println(s)
 	if req.Method == "POST" {
 		SignInPOSTHandle(res, req)
 		return
