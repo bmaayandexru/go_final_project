@@ -27,7 +27,8 @@ func openDB(t *testing.T) *sqlx.DB {
 	dbfile := DBFile
 	envFile := os.Getenv("TODO_DBFILE")
 	if len(envFile) > 0 {
-		dbfile = envFile
+		//		dbfile = envFile			// так было
+		dbfile = "../" + envFile // так чтоб работало с переменной окружения
 	}
 	db, err := sqlx.Connect("sqlite3", dbfile)
 	assert.NoError(t, err)

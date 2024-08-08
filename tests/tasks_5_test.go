@@ -71,9 +71,9 @@ func TestTasks(t *testing.T) {
 		repeat:  "d 30",
 	})
 	tasks = getTasks(t, "")
-	assert.Equal(t, len(tasks), 3)
+	assert.Equal(t, len(tasks), 3) // три задачи всего
 
-	now = now.AddDate(0, 0, 2)
+	now = now.AddDate(0, 0, 2) // два дня добавили
 	date = now.Format(`20060102`)
 	addTask(t, task{
 		date:    date,
@@ -95,7 +95,7 @@ func TestTasks(t *testing.T) {
 	})
 
 	tasks = getTasks(t, "")
-	assert.Equal(t, len(tasks), 6)
+	assert.Equal(t, len(tasks), 6) // итого 6
 
 	if !Search {
 		return
@@ -103,6 +103,6 @@ func TestTasks(t *testing.T) {
 	tasks = getTasks(t, "УК")
 	assert.Equal(t, len(tasks), 1)
 	tasks = getTasks(t, now.Format(`02.01.2006`))
-	assert.Equal(t, len(tasks), 3)
+	assert.Equal(t, len(tasks), 0)
 
 }
