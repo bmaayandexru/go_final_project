@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"time"
 
-	dbt "github.com/bmaayandexru/go_final_project/dbt"
 	nd "github.com/bmaayandexru/go_final_project/nextdate"
 	"github.com/bmaayandexru/go_final_project/service"
+	"github.com/bmaayandexru/go_final_project/storage"
 )
 
 // для формирования ошибки
@@ -45,7 +45,7 @@ type strcEmpty struct{}
 
 // для формирования слайса задач
 type strcTasks struct {
-	Tasks []dbt.Task `json:"tasks"`
+	Tasks []storage.Task `json:"tasks"`
 }
 
 var sTasks strcTasks
@@ -87,9 +87,9 @@ func TasksGETSearch(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Ts GET SS: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	sTasks.Tasks = make([]dbt.Task, 0)
+	sTasks.Tasks = make([]storage.Task, 0)
 	for rows.Next() {
-		task := dbt.Task{}
+		task := storage.Task{}
 		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 		if err != nil {
 			fmt.Println(err)
@@ -114,15 +114,15 @@ func TasksGETSearch(res http.ResponseWriter, req *http.Request) {
 }
 
 func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
-	rows, err := service.Service.QueryAllTasks()
+	rows, err := service.Service.Find("")
 	if err != nil {
 		fmt.Println(err)
 		retError(res, fmt.Sprintf("Ts GET AT: Ошибка запроса: %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	sTasks.Tasks = make([]dbt.Task, 0)
+	sTasks.Tasks = make([]storage.Task, 0)
 	for rows.Next() {
-		task := dbt.Task{}
+		task := storage.Task{}
 		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
 		if err != nil {
 			fmt.Println(err)
@@ -149,19 +149,17 @@ func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
 func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
 	fmt.Printf("Tk GET id %s\n", id)
-	task, err := service.Service.Select(id)
+	task, err := service.Service.Get(id)
 	if err != nil {
 		fmt.Println(err)
 		retError(res, fmt.Sprintf("Tk GET id: Ошибка row.Scan(): %s\n", err.Error()), http.StatusOK)
 		return
 	}
-	fmt.Println("Считана задача: ", task)
 	arrBytes, err := json.Marshal(task)
 	if err != nil {
 		retError(res, fmt.Sprintf("Tk GET id: Ошибка json.Marshal(sTsks): %v\n", err), http.StatusOK)
 		return
 	}
-	fmt.Printf("Tk GET id ret json *%s*\n", string(arrBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	_, _ = res.Write(arrBytes)
@@ -181,7 +179,7 @@ func TasksGETHandle(res http.ResponseWriter, req *http.Request) {
 }
 
 func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
-	var task dbt.Task
+	var task storage.Task
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(req.Body)
 	if err != nil {
@@ -203,7 +201,7 @@ func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// тут ID строка
-	_, err = service.Service.Select(task.ID)
+	_, err = service.Service.Get(task.ID)
 	if err != nil { // запрос SELECT * WHERE id = :id не должен вернуть ошибку
 		retError(res, fmt.Sprintf("Tk PUT: ID нет в базе. Ошибка: %v\n", err), http.StatusOK)
 		return
@@ -261,7 +259,7 @@ func TaskPUTHandle(res http.ResponseWriter, req *http.Request) {
 
 func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
 	// добавление задачи
-	var task dbt.Task
+	var task storage.Task
 	var buf bytes.Buffer
 	var err error
 	var bId strcId
@@ -338,7 +336,7 @@ func TaskDELETEHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, "Tk DELETE. id не число", http.StatusOK)
 		return
 	}
-	if _, err := service.Service.Select(id); err != nil {
+	if _, err := service.Service.Get(id); err != nil {
 		retError(res, fmt.Sprintf("Tk DELETE: id нет в базе. %s", err.Error()), http.StatusOK)
 		return
 	}
@@ -377,7 +375,7 @@ func TaskDonePOSTHandle(res http.ResponseWriter, req *http.Request) {
 	// задача выполнена
 	id := req.URL.Query().Get("id")
 	fmt.Printf("Tkd POST id %s\n", id)
-	task, err := service.Service.Select(id)
+	task, err := service.Service.Get(id)
 	if err != nil {
 		fmt.Println(err)
 		retError(res, fmt.Sprintf("Tkd POST id: Ошибка row.Scan(): %s\n", err.Error()), http.StatusOK)
@@ -413,7 +411,6 @@ func TaskDonePOSTHandle(res http.ResponseWriter, req *http.Request) {
 		retError(res, fmt.Sprintf("Tkd POST: Ошибка json.Marshal(): %v\n", err), http.StatusOK)
 		return
 	}
-	fmt.Printf("Tkd POST: ret json *%s*\n", string(arrBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
 	_, _ = res.Write(arrBytes)

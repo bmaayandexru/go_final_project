@@ -6,27 +6,30 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/bmaayandexru/go_final_project/dbt"
 	"github.com/bmaayandexru/go_final_project/handlers"
 	"github.com/bmaayandexru/go_final_project/service"
+	"github.com/bmaayandexru/go_final_project/storage"
 	"github.com/bmaayandexru/go_final_project/tests"
 )
 
 var (
 	mux *http.ServeMux
-	DB  *sql.DB
+	db  *sql.DB
 	err error
 )
 
 func main() {
+	// инициализация сервиса и хранилища
+	// service.InitStoreAndService(DB)
 	// открытие БД
-	if DB, err = dbt.InitDBase(); err != nil {
+	if db, err = storage.InitDBase(); err != nil {
 		fmt.Printf("Ошибка открытия базы %v\n", err)
 		panic(err)
 	}
-	defer DB.Close()
-	// инициализация сервиса и хранилища
-	service.InitStoreAndService(DB)
+	defer db.Close()
+	store := storage.NewTaskStore(db)
+	service.Service = service.NewTaskService(store)
+
 	// поднимаем сервер
 	mux = http.NewServeMux()
 	// вешаем обработчики
@@ -50,7 +53,6 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// смотрим наличие пароля
 		pass := os.Getenv("TODO_PASSWORD")
-		fmt.Printf("env password *%s*\n", pass)
 		// авторизация будет проверяться только при наличии TODO_PASSWORD
 		// иначе не будет
 		if len(pass) == 0 {
@@ -68,7 +70,6 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 			jwtp := handlers.JwtFromPass(pass)
 			// здесь код для валидации и проверки JWT-токена
 			valid = (jwt == jwtp)
-			fmt.Println("auth valid: ", valid)
 			if !valid {
 				// возвращаем ошибку авторизации 401
 				http.Error(w, "Authentification required", http.StatusUnauthorized)
@@ -88,7 +89,6 @@ func defStrPort() string {
 		defPort = settingsStrPort
 	}
 	envStrPort := os.Getenv("TODO_PORT")
-	fmt.Printf("env port *%s* \n", envStrPort)
 	if envStrPort != "" {
 		defPort = envStrPort
 	}
