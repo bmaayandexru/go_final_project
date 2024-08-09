@@ -20,7 +20,6 @@ var (
 
 func main() {
 	// инициализация сервиса и хранилища
-	// service.InitStoreAndService(DB)
 	// открытие БД
 	if db, err = storage.InitDBase(); err != nil {
 		fmt.Printf("Ошибка открытия базы %v\n", err)
@@ -54,7 +53,6 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 		// смотрим наличие пароля
 		pass := os.Getenv("TODO_PASSWORD")
 		// авторизация будет проверяться только при наличии TODO_PASSWORD
-		// иначе не будет
 		if len(pass) == 0 {
 			// это чтоб работало без переменной окружения
 			pass = handlers.CPassword

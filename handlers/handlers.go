@@ -66,12 +66,9 @@ func NextDateHandle(res http.ResponseWriter, req *http.Request) {
 }
 
 func retError(res http.ResponseWriter, sErr string, statusCode int) {
-	// переименовать в retError
 	var bE strcErr
 	bE.Error = sErr
 	aBytes, _ := json.Marshal(bE)
-	// *** лог контроль
-	fmt.Println("retError: aBytes ", string(aBytes))
 	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(statusCode)
 	_, _ = res.Write(aBytes)
@@ -79,7 +76,6 @@ func retError(res http.ResponseWriter, sErr string, statusCode int) {
 
 func TasksGETSearch(res http.ResponseWriter, req *http.Request) {
 	search := req.URL.Query().Get("search")
-	fmt.Printf("Строка *%s*\n", search)
 	// нашли строку
 	rows, err := service.Service.Find(search)
 	if err != nil {
@@ -148,7 +144,6 @@ func TasksGETAllTasks(res http.ResponseWriter, req *http.Request) {
 
 func TaskGETHandle(res http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
-	fmt.Printf("Tk GET id %s\n", id)
 	task, err := service.Service.Get(id)
 	if err != nil {
 		fmt.Println(err)
@@ -326,7 +321,6 @@ func TaskPOSTHandle(res http.ResponseWriter, req *http.Request) {
 func TaskDELETEHandle(res http.ResponseWriter, req *http.Request) {
 	// получить id
 	id := req.URL.Query().Get("id")
-	fmt.Printf("Tk DELETE id %s\n", id)
 	if len(id) == 0 {
 		// нет id
 		retError(res, "Tk DELETE. Нет id", http.StatusOK)
@@ -374,7 +368,6 @@ func TaskHandle(res http.ResponseWriter, req *http.Request) {
 func TaskDonePOSTHandle(res http.ResponseWriter, req *http.Request) {
 	// задача выполнена
 	id := req.URL.Query().Get("id")
-	fmt.Printf("Tkd POST id %s\n", id)
 	task, err := service.Service.Get(id)
 	if err != nil {
 		fmt.Println(err)

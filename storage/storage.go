@@ -76,7 +76,6 @@ func (ts TaskStore) Update(task Task) (sql.Result, error) {
 		sql.Named("repeat", task.Repeat))
 }
 
-// ********************************************
 var schemaSQL string = `
 CREATE TABLE scheduler (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
