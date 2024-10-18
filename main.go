@@ -90,6 +90,7 @@ func defStrPort() string {
 	if envStrPort != "" {
 		defPort = envStrPort
 	}
+	// defPort = "7540"
 	fmt.Printf("Set port %s \n", defPort)
 	return ":" + defPort
 }
